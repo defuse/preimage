@@ -201,7 +201,7 @@ impl LookupTable {
 }
 
 /// Parse a hex-encoded hash string into raw bytes.
-fn parse_hash_hex(hash_hex: &str) -> Result<Vec<u8>> {
+pub(crate) fn parse_hash_hex(hash_hex: &str) -> Result<Vec<u8>> {
     if hash_hex.len() % 2 != 0 {
         bail!("hash hex string has odd length");
     }

@@ -4,7 +4,7 @@ use preimage::builder::IndexBuilder;
 use preimage::checker::check_sorted;
 use preimage::hashing::*;
 use preimage::lookup::{LookupMatch, LookupTable};
-use preimage::oracle::PreimageOracle;
+use preimage::oracle::{HashResult, PreimageOracle};
 use preimage::sorter::IndexSorter;
 use tempfile::NamedTempFile;
 
@@ -296,12 +296,18 @@ fn test_oracle_multi_algorithm() {
     let results = oracle.crack(&[&md5_hash, &sha1_hash], false);
     assert_eq!(results.len(), 2);
 
-    let full_0: Vec<_> = results[0].matches.iter()
+    let HashResult::Lookup { matches: matches_0, .. } = &results[0] else {
+        panic!("expected Lookup variant for MD5 hash");
+    };
+    let full_0: Vec<_> = matches_0.iter()
         .filter(|m| m.lookup_match.is_full())
         .collect();
     assert!(!full_0.is_empty(), "MD5 banana should be found");
 
-    let full_1: Vec<_> = results[1].matches.iter()
+    let HashResult::Lookup { matches: matches_1, .. } = &results[1] else {
+        panic!("expected Lookup variant for SHA1 hash");
+    };
+    let full_1: Vec<_> = matches_1.iter()
         .filter(|m| m.lookup_match.is_full())
         .collect();
     assert!(!full_1.is_empty(), "SHA1 banana should be found");

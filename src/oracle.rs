@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::hashing::HashAlgorithm;
-use crate::lookup::{LookupMatch, LookupTable};
+use crate::lookup::{parse_hash_hex, LookupMatch, LookupTable};
 
 /// A match from the oracle, wrapping a LookupMatch with table context.
 pub struct OracleMatch<'a> {
@@ -14,11 +14,16 @@ pub struct OracleMatch<'a> {
 }
 
 /// Result for one queried hash across all tables.
-pub struct HashResult<'a> {
-    /// The hex hash that was queried.
-    pub queried_hash: String,
-    /// All matches found (may be empty if not cracked).
-    pub matches: Vec<OracleMatch<'a>>,
+pub enum HashResult<'a> {
+    /// The input was a valid hex hash; matches may be empty (not found).
+    Lookup {
+        queried_hash: String,
+        matches: Vec<OracleMatch<'a>>,
+    },
+    /// The input was not a valid hash format (non-hex, odd-length, or too short).
+    InvalidFormat {
+        input: String,
+    },
 }
 
 /// Multi-table hash lookup oracle.
@@ -82,18 +87,32 @@ impl PreimageOracle {
     ///
     /// Returns results in the same order as the input hashes.
     pub fn crack<'a>(&'a self, hashes: &[&str], early_exit: bool) -> Vec<HashResult<'a>> {
+        // Validate all hashes upfront. Invalid ones get InvalidFormat immediately.
         let mut results: Vec<HashResult<'a>> = hashes
             .iter()
-            .map(|h| HashResult {
-                queried_hash: h.to_string(),
-                matches: Vec::new(),
+            .map(|h| {
+                if parse_hash_hex(h).is_ok() {
+                    HashResult::Lookup {
+                        queried_hash: h.to_string(),
+                        matches: Vec::new(),
+                    }
+                } else {
+                    HashResult::InvalidFormat {
+                        input: h.to_string(),
+                    }
+                }
             })
             .collect();
 
         for table in &self.tables {
             for (i, hash_hex) in hashes.iter().enumerate() {
+                // Skip invalid hashes entirely
+                let HashResult::Lookup { matches, .. } = &mut results[i] else {
+                    continue;
+                };
+
                 // Skip if early_exit and we already have a full match
-                if early_exit && has_full_match(&results[i]) {
+                if early_exit && has_full_match_in(matches) {
                     continue;
                 }
 
@@ -103,7 +122,7 @@ impl PreimageOracle {
                 };
 
                 for lm in lookup_matches {
-                    results[i].matches.push(OracleMatch {
+                    matches.push(OracleMatch {
                         table_label: &table.label,
                         lookup_match: lm,
                     });
@@ -115,11 +134,20 @@ impl PreimageOracle {
     }
 }
 
-fn has_full_match(result: &HashResult<'_>) -> bool {
-    result
-        .matches
+/// Check if a matches vec already contains a full match (used in crack loop).
+fn has_full_match_in(matches: &[OracleMatch<'_>]) -> bool {
+    matches
         .iter()
         .any(|m| matches!(&m.lookup_match, LookupMatch::Full { .. }))
+}
+
+/// Check if a HashResult has a full match (used in tests).
+#[cfg(test)]
+fn has_full_match(result: &HashResult<'_>) -> bool {
+    match result {
+        HashResult::Lookup { matches, .. } => has_full_match_in(matches),
+        HashResult::InvalidFormat { .. } => false,
+    }
 }
 
 #[cfg(test)]
@@ -158,7 +186,10 @@ mod tests {
         // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
         let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], false);
         assert_eq!(results.len(), 1);
-        assert!(!results[0].matches.is_empty());
+        let HashResult::Lookup { matches, .. } = &results[0] else {
+            panic!("expected Lookup variant");
+        };
+        assert!(!matches.is_empty());
         assert!(has_full_match(&results[0]));
     }
 
@@ -179,8 +210,10 @@ mod tests {
         // MD5("apple")
         let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], false);
         assert_eq!(results.len(), 1);
-        let full: Vec<_> = results[0]
-            .matches
+        let HashResult::Lookup { matches, .. } = &results[0] else {
+            panic!("expected Lookup variant");
+        };
+        let full: Vec<_> = matches
             .iter()
             .filter(|m| matches!(&m.lookup_match, LookupMatch::Full { .. }))
             .collect();
@@ -206,8 +239,10 @@ mod tests {
         // With early_exit, should only find in first table
         let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], true);
         assert_eq!(results.len(), 1);
-        let full: Vec<_> = results[0]
-            .matches
+        let HashResult::Lookup { matches, .. } = &results[0] else {
+            panic!("expected Lookup variant");
+        };
+        let full: Vec<_> = matches
             .iter()
             .filter(|m| matches!(&m.lookup_match, LookupMatch::Full { .. }))
             .collect();
@@ -227,7 +262,10 @@ mod tests {
 
         let results = oracle.crack(&["ffffffffffffffffffffffffffffffff"], false);
         assert_eq!(results.len(), 1);
-        assert!(results[0].matches.is_empty());
+        let HashResult::Lookup { matches, .. } = &results[0] else {
+            panic!("expected Lookup variant");
+        };
+        assert!(matches.is_empty());
     }
 
     #[test]
@@ -250,6 +288,81 @@ mod tests {
         );
         assert_eq!(results.len(), 3);
         assert!(has_full_match(&results[0]), "apple should be found");
-        assert!(results[1].matches.is_empty(), "bogus hash should not match");
+        let HashResult::Lookup { matches, .. } = &results[1] else {
+            panic!("expected Lookup variant for bogus hash");
+        };
+        assert!(matches.is_empty(), "bogus hash should not match");
+    }
+
+    #[test]
+    fn test_oracle_invalid_format() {
+        let words = test_words_path();
+        let idx = build_and_sort(&Md5, &words);
+
+        let mut oracle = PreimageOracle::new();
+        oracle
+            .register("md5", Md5, idx.path(), &words)
+            .expect("register");
+
+        let results = oracle.crack(
+            &[
+                "xyz",                                // non-hex
+                "abc",                                // too short + odd
+                "1f3870be274f6c49b3e31a0c6728957f",   // valid MD5("apple")
+            ],
+            false,
+        );
+        assert_eq!(results.len(), 3);
+
+        assert!(
+            matches!(&results[0], HashResult::InvalidFormat { input } if input == "xyz"),
+            "non-hex should be InvalidFormat"
+        );
+        assert!(
+            matches!(&results[1], HashResult::InvalidFormat { input } if input == "abc"),
+            "too-short should be InvalidFormat"
+        );
+        assert!(has_full_match(&results[2]), "valid hash should be cracked");
+    }
+
+    #[test]
+    fn test_oracle_invalid_mixed_with_valid() {
+        let words = test_words_path();
+        let idx = build_and_sort(&Md5, &words);
+
+        let mut oracle = PreimageOracle::new();
+        oracle
+            .register("md5", Md5, idx.path(), &words)
+            .expect("register");
+
+        let results = oracle.crack(
+            &[
+                "1f3870be274f6c49b3e31a0c6728957f",   // valid: apple
+                "not_hex_at_all!!",                    // invalid
+                "ffffffffffffffffffffffffffffffff",   // valid: not found
+                "abcde",                              // invalid: odd + short
+            ],
+            false,
+        );
+        assert_eq!(results.len(), 4);
+
+        // First: valid, found
+        assert!(has_full_match(&results[0]), "apple should be found");
+
+        // Second: invalid
+        assert!(
+            matches!(&results[1], HashResult::InvalidFormat { input } if input == "not_hex_at_all!!"),
+        );
+
+        // Third: valid, not found
+        let HashResult::Lookup { matches, .. } = &results[2] else {
+            panic!("expected Lookup variant for not-found hash");
+        };
+        assert!(matches.is_empty());
+
+        // Fourth: invalid
+        assert!(
+            matches!(&results[3], HashResult::InvalidFormat { input } if input == "abcde"),
+        );
     }
 }

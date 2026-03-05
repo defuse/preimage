@@ -10,7 +10,7 @@ use preimage::checker::check_sorted;
 use preimage::hashing::{self, HashAlgorithm};
 use preimage::lookup::{LookupMatch, LookupTable};
 #[cfg(feature = "config")]
-use preimage::oracle::PreimageOracle;
+use preimage::oracle::{HashResult, PreimageOracle};
 use preimage::sorter::IndexSorter;
 
 #[derive(Parser)]
@@ -301,34 +301,40 @@ fn lookup_with_config(config_path: &PathBuf, hashes: &[String], early_exit: bool
     let results = oracle.crack(&hash_refs, early_exit);
 
     for result in &results {
-        if result.matches.is_empty() {
-            println!("{}: NOT FOUND", result.queried_hash);
-        } else {
-            for m in &result.matches {
-                let plaintext = m.lookup_match.plaintext_lossy();
-                match &m.lookup_match {
-                    LookupMatch::Full { algorithm, .. } => {
-                        println!(
-                            "{}: {} [{}] ({})",
-                            result.queried_hash,
-                            plaintext,
-                            m.table_label,
-                            algorithm.name()
-                        );
-                    }
-                    LookupMatch::Partial {
-                        algorithm,
-                        recomputed_hash,
-                        ..
-                    } => {
-                        println!(
-                            "{}: {} [{}] ({}, partial, full hash: {})",
-                            result.queried_hash,
-                            plaintext,
-                            m.table_label,
-                            algorithm.name(),
-                            hex::encode(recomputed_hash)
-                        );
+        match result {
+            HashResult::InvalidFormat { input } => {
+                println!("{}: INVALID FORMAT", input);
+            }
+            HashResult::Lookup { queried_hash, matches } if matches.is_empty() => {
+                println!("{}: NOT FOUND", queried_hash);
+            }
+            HashResult::Lookup { queried_hash, matches } => {
+                for m in matches {
+                    let plaintext = m.lookup_match.plaintext_lossy();
+                    match &m.lookup_match {
+                        LookupMatch::Full { algorithm, .. } => {
+                            println!(
+                                "{}: {} [{}] ({})",
+                                queried_hash,
+                                plaintext,
+                                m.table_label,
+                                algorithm.name()
+                            );
+                        }
+                        LookupMatch::Partial {
+                            algorithm,
+                            recomputed_hash,
+                            ..
+                        } => {
+                            println!(
+                                "{}: {} [{}] ({}, partial, full hash: {})",
+                                queried_hash,
+                                plaintext,
+                                m.table_label,
+                                algorithm.name(),
+                                hex::encode(recomputed_hash)
+                            );
+                        }
                     }
                 }
             }
