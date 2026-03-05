@@ -3,7 +3,7 @@ mod ntlm;
 mod lm;
 mod compound;
 
-pub use standard::{Md5, Sha1, Sha224, Sha256, Sha384, Sha512, Whirlpool, Ripemd160};
+pub use standard::{Md2, Md4, Md5, Sha1, Sha224, Sha256, Sha384, Sha512, Whirlpool, Ripemd160};
 pub use ntlm::Ntlm;
 pub use lm::Lm;
 pub use compound::{Md5Md5, MySql41, QubesV31};
@@ -29,6 +29,8 @@ pub trait HashAlgorithm: Send + Sync {
 /// algorithm types directly (e.g. `Md5`, `Sha1`).
 pub fn get_algorithm(name: &str) -> Option<Box<dyn HashAlgorithm>> {
     match name {
+        "md2" => Some(Box::new(Md2)),
+        "md4" => Some(Box::new(Md4)),
         "md5" => Some(Box::new(Md5)),
         "sha1" => Some(Box::new(Sha1)),
         "sha224" => Some(Box::new(Sha224)),
@@ -49,6 +51,8 @@ pub fn get_algorithm(name: &str) -> Option<Box<dyn HashAlgorithm>> {
 /// Return a list of all supported algorithm names.
 pub fn list_algorithms() -> Vec<&'static str> {
     vec![
+        "md2",
+        "md4",
         "md5",
         "sha1",
         "sha224",

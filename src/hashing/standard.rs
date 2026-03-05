@@ -19,6 +19,8 @@ macro_rules! standard_hash {
     };
 }
 
+standard_hash!(Md2, "md2", md2::Md2);
+standard_hash!(Md4, "md4", md4::Md4);
 standard_hash!(Md5, "md5", md5::Md5);
 standard_hash!(Sha1, "sha1", sha1::Sha1);
 standard_hash!(Sha224, "sha224", sha2::Sha224);
@@ -31,6 +33,30 @@ standard_hash!(Ripemd160, "ripemd160", ripemd::Ripemd160);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_md2() {
+        let hash = Md2.hash(b"").expect("md2 should not fail");
+        assert_eq!(hex::encode(&hash), "8350e5a3e24c153df2275c9f80692773");
+    }
+
+    #[test]
+    fn test_md2_hello() {
+        let hash = Md2.hash(b"hello").expect("md2 should not fail");
+        assert_eq!(hex::encode(&hash), "a9046c73e00331af68917d3804f70655");
+    }
+
+    #[test]
+    fn test_md4() {
+        let hash = Md4.hash(b"").expect("md4 should not fail");
+        assert_eq!(hex::encode(&hash), "31d6cfe0d16ae931b73c59d7e0c089c0");
+    }
+
+    #[test]
+    fn test_md4_hello() {
+        let hash = Md4.hash(b"hello").expect("md4 should not fail");
+        assert_eq!(hex::encode(&hash), "866437cb7a794bce2b727acc0362ee27");
+    }
 
     #[test]
     fn test_md5() {
