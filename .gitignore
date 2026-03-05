@@ -1,0 +1,3 @@
+/target/
+*.idx
+!tests/test_data/*.idx
