@@ -63,13 +63,13 @@ EXAMPLES:
     preimage sort md5.idx
 
   Sort with 4 GiB buffer:
-    preimage sort --memory 4096 md5.idx
+    preimage sort --memory 4G md5.idx
 
   Sort entirely in RAM:
     preimage sort --ram md5.idx")]
     Sort {
-        /// Sort buffer size in MiB
-        #[arg(short, long, default_value_t = 256)]
+        /// Sort buffer size (e.g. 256M, 4G, 1024K). Plain number means MiB.
+        #[arg(short, long, default_value = "256M", value_parser = parse_memory_size)]
         memory: usize,
         /// Load entire file into RAM; error if it doesn't fit
         #[arg(long)]
@@ -119,6 +119,35 @@ struct LookupArgs {
     early_exit: bool,
     /// Hex-encoded hash(es) to look up
     hashes: Vec<String>,
+}
+
+fn parse_memory_size(s: &str) -> std::result::Result<usize, String> {
+    let s = s.trim();
+    let (num_str, multiplier) = if let Some(n) = s.strip_suffix('G') {
+        (n, 1024)
+    } else if let Some(n) = s.strip_suffix('M') {
+        (n, 1)
+    } else if let Some(n) = s.strip_suffix('K') {
+        (n, 0) // handled below
+    } else {
+        return Err(format!("missing suffix: use K, M, or G (e.g. 256M, 4G)"));
+    };
+
+    let num: f64 = num_str
+        .trim()
+        .parse()
+        .map_err(|_| format!("invalid number: {num_str:?}"))?;
+
+    if num < 0.0 {
+        return Err("memory size cannot be negative".to_string());
+    }
+
+    // For K suffix, compute in KiB then convert to MiB (rounding down, minimum 0)
+    if s.ends_with('K') {
+        return Ok((num / 1024.0) as usize);
+    }
+
+    Ok((num * multiplier as f64) as usize)
 }
 
 fn main() -> Result<()> {
