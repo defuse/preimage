@@ -2,3 +2,6 @@
 *.idx
 !tests/test_data/*.idx
 benchmark_data/
+flamegraph.svg
+perf.data
+perf.data.old
