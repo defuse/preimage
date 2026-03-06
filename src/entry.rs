@@ -8,6 +8,15 @@ pub const ENTRY_SIZE: usize = HASH_PREFIX_LEN + POSITION_LEN;
 /// Maximum position value that fits in 48 bits.
 const MAX_POSITION: u64 = 0xFFFF_FFFF_FFFF;
 
+/// Decode a 48-bit little-endian position from a 6-byte slice.
+pub fn decode_position(bytes: &[u8; POSITION_LEN]) -> u64 {
+    let mut value: u64 = 0;
+    for i in (0..POSITION_LEN).rev() {
+        value = (value << 8) | bytes[i] as u64;
+    }
+    value
+}
+
 /// A single entry in the index file, matching the C struct layout exactly.
 ///
 /// Layout: [8 bytes hash prefix][6 bytes little-endian position]
@@ -37,12 +46,7 @@ impl IndexEntry {
 
     /// Decode the 48-bit little-endian position.
     pub fn position(&self) -> u64 {
-        let pos = self.position;
-        let mut value: u64 = 0;
-        for i in (0..POSITION_LEN).rev() {
-            value = (value << 8) | pos[i] as u64;
-        }
-        value
+        decode_position(&self.position)
     }
 
     /// Lexicographic byte comparison: hash prefix first, then position as

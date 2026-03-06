@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Result};
 use memmap2::Mmap;
 
-use crate::entry::{ENTRY_SIZE, HASH_PREFIX_LEN};
+use crate::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
 use crate::hashing::HashAlgorithm;
 
 /// A match from looking up one hash against one index.
@@ -40,6 +40,22 @@ impl<'a> LookupMatch<'a> {
         String::from_utf8_lossy(self.plaintext())
     }
 
+    /// Get the recomputed full hash bytes.
+    pub fn recomputed_hash(&self) -> &[u8] {
+        match self {
+            LookupMatch::Full { recomputed_hash, .. } => recomputed_hash,
+            LookupMatch::Partial { recomputed_hash, .. } => recomputed_hash,
+        }
+    }
+
+    /// Get the algorithm that produced this match.
+    pub fn algorithm(&self) -> &'a dyn HashAlgorithm {
+        match self {
+            LookupMatch::Full { algorithm, .. } => *algorithm,
+            LookupMatch::Partial { algorithm, .. } => *algorithm,
+        }
+    }
+
     /// Returns true if this is a full match.
     pub fn is_full(&self) -> bool {
         matches!(self, LookupMatch::Full { .. })
@@ -55,23 +71,14 @@ pub struct LookupTable {
 }
 
 impl LookupTable {
-    /// Open a lookup table. The algorithm type is passed directly — no Box
-    /// needed in user code.
+    /// Open a lookup table.
     ///
     /// The index file must be sorted. The dictionary file is the original
     /// wordlist used to create the index.
+    ///
+    /// Accepts any `HashAlgorithm` implementor, including `Box<dyn HashAlgorithm>`.
     pub fn open(
         algorithm: impl HashAlgorithm + 'static,
-        index_path: &Path,
-        dict_path: &Path,
-    ) -> Result<Self> {
-        Self::open_boxed(Box::new(algorithm), index_path, dict_path)
-    }
-
-    /// Open a lookup table from a boxed algorithm (used by CLI code that
-    /// resolves algorithm names at runtime).
-    pub fn open_boxed(
-        algorithm: Box<dyn HashAlgorithm>,
         index_path: &Path,
         dict_path: &Path,
     ) -> Result<Self> {
@@ -93,7 +100,7 @@ impl LookupTable {
         let index_mmap = unsafe { Mmap::map(&index_file)? };
 
         Ok(Self {
-            algorithm,
+            algorithm: Box::new(algorithm),
             index_mmap,
             dict_path: dict_path.to_path_buf(),
             entry_count,
@@ -191,12 +198,10 @@ impl LookupTable {
     /// Read the 48-bit LE position of an entry directly from the mmap.
     fn get_entry_position(&self, index: u64) -> u64 {
         let offset = index as usize * ENTRY_SIZE + HASH_PREFIX_LEN;
-        let pos_bytes = &self.index_mmap[offset..offset + 6];
-        let mut value: u64 = 0;
-        for i in (0..6).rev() {
-            value = (value << 8) | pos_bytes[i] as u64;
-        }
-        value
+        let bytes: &[u8; POSITION_LEN] = self.index_mmap[offset..offset + POSITION_LEN]
+            .try_into()
+            .expect("slice is exactly POSITION_LEN bytes");
+        decode_position(bytes)
     }
 }
 

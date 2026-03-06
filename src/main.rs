@@ -8,9 +8,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use preimage::builder::IndexBuilder;
 use preimage::checker::check_sorted;
 use preimage::hashing::{self, HashAlgorithm};
-use preimage::lookup::{LookupMatch, LookupTable};
+use preimage::lookup::LookupTable;
 #[cfg(feature = "config")]
-use preimage::oracle::{HashResult, PreimageOracle};
+use preimage::{PreimageOracle, HashResult};
 use preimage::sorter::IndexSorter;
 
 #[derive(Parser)]
@@ -240,7 +240,7 @@ fn lookup_single(
     hashes: &[String],
 ) -> Result<()> {
     let algorithm = algorithm_from_name(algorithm_name);
-    let table = LookupTable::open_boxed(algorithm, index_path, dict_path)?;
+    let table = LookupTable::open(algorithm, index_path, dict_path)?;
 
     for hash_hex in hashes {
         let matches = table.lookup(hash_hex)?;
@@ -249,21 +249,14 @@ fn lookup_single(
         } else {
             for m in &matches {
                 let plaintext = m.plaintext_lossy();
-                match m {
-                    LookupMatch::Full { algorithm, .. } => {
-                        println!("{hash_hex}: {plaintext} [{}]", algorithm.name());
-                    }
-                    LookupMatch::Partial {
-                        algorithm,
-                        recomputed_hash,
-                        ..
-                    } => {
-                        println!(
-                            "{hash_hex}: {plaintext} [{}] (partial, full hash: {})",
-                            algorithm.name(),
-                            hex::encode(recomputed_hash)
-                        );
-                    }
+                if m.is_full() {
+                    println!("{hash_hex}: {plaintext} [{}]", m.algorithm().name());
+                } else {
+                    println!(
+                        "{hash_hex}: {plaintext} [{}] (partial, full hash: {})",
+                        m.algorithm().name(),
+                        hex::encode(m.recomputed_hash())
+                    );
                 }
             }
         }
@@ -294,7 +287,7 @@ fn lookup_with_config(config_path: &PathBuf, hashes: &[String], early_exit: bool
     let mut oracle = PreimageOracle::new();
     for tc in &config.table {
         let algorithm = algorithm_from_name(&tc.algorithm);
-        oracle.register_boxed(&tc.label, algorithm, &tc.index, &tc.dictionary)?;
+        oracle.register(&tc.label, algorithm, &tc.index, &tc.dictionary)?;
     }
 
     let hash_refs: Vec<&str> = hashes.iter().map(|s| s.as_str()).collect();
@@ -310,31 +303,19 @@ fn lookup_with_config(config_path: &PathBuf, hashes: &[String], early_exit: bool
             }
             HashResult::Lookup { queried_hash, matches } => {
                 for m in matches {
-                    let plaintext = m.lookup_match.plaintext_lossy();
-                    match &m.lookup_match {
-                        LookupMatch::Full { algorithm, .. } => {
-                            println!(
-                                "{}: {} [{}] ({})",
-                                queried_hash,
-                                plaintext,
-                                m.table_label,
-                                algorithm.name()
-                            );
-                        }
-                        LookupMatch::Partial {
-                            algorithm,
-                            recomputed_hash,
-                            ..
-                        } => {
-                            println!(
-                                "{}: {} [{}] ({}, partial, full hash: {})",
-                                queried_hash,
-                                plaintext,
-                                m.table_label,
-                                algorithm.name(),
-                                hex::encode(recomputed_hash)
-                            );
-                        }
+                    let lm = &m.lookup_match;
+                    let plaintext = lm.plaintext_lossy();
+                    if lm.is_full() {
+                        println!(
+                            "{}: {} [{}] ({})",
+                            queried_hash, plaintext, m.table_label, lm.algorithm().name()
+                        );
+                    } else {
+                        println!(
+                            "{}: {} [{}] ({}, partial, full hash: {})",
+                            queried_hash, plaintext, m.table_label,
+                            lm.algorithm().name(), hex::encode(lm.recomputed_hash())
+                        );
                     }
                 }
             }

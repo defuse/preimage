@@ -1,10 +1,10 @@
 pub mod entry;
 pub mod hashing;
-#[cfg(feature = "cli")]
+#[cfg(feature = "build")]
 pub mod builder;
-#[cfg(feature = "cli")]
+#[cfg(feature = "build")]
 pub mod sorter;
-#[cfg(feature = "cli")]
+#[cfg(feature = "build")]
 pub mod checker;
 pub mod lookup;
 pub mod oracle;
@@ -12,9 +12,9 @@ pub mod oracle;
 pub use hashing::{HashAlgorithm, get_algorithm, list_algorithms};
 pub use lookup::{LookupTable, LookupMatch};
 pub use oracle::{PreimageOracle, OracleMatch, HashResult};
-#[cfg(feature = "cli")]
+#[cfg(feature = "build")]
 pub use builder::IndexBuilder;
-#[cfg(feature = "cli")]
+#[cfg(feature = "build")]
 pub use sorter::IndexSorter;
-#[cfg(feature = "cli")]
+#[cfg(feature = "build")]
 pub use checker::check_sorted;

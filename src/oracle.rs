@@ -43,8 +43,9 @@ impl PreimageOracle {
         Self { tables: Vec::new() }
     }
 
-    /// Register a lookup table. The algorithm type is passed directly
-    /// (no Box needed in user code — type erasure is internal).
+    /// Register a lookup table.
+    ///
+    /// Accepts any `HashAlgorithm` implementor, including `Box<dyn HashAlgorithm>`.
     pub fn register(
         &mut self,
         label: &str,
@@ -53,22 +54,6 @@ impl PreimageOracle {
         dict_path: &Path,
     ) -> Result<()> {
         let lookup = LookupTable::open(algorithm, index_path, dict_path)?;
-        self.tables.push(Table {
-            label: label.to_string(),
-            lookup,
-        });
-        Ok(())
-    }
-
-    /// Register a lookup table from a boxed algorithm (used by CLI code).
-    pub fn register_boxed(
-        &mut self,
-        label: &str,
-        algorithm: Box<dyn HashAlgorithm>,
-        index_path: &Path,
-        dict_path: &Path,
-    ) -> Result<()> {
-        let lookup = LookupTable::open_boxed(algorithm, index_path, dict_path)?;
         self.tables.push(Table {
             label: label.to_string(),
             lookup,

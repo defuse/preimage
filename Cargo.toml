@@ -25,7 +25,8 @@ serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
 default = ["config", "cli"]
-cli = ["dep:clap", "dep:indicatif"]
+build = ["dep:indicatif"]
+cli = ["build", "dep:clap"]
 config = ["dep:toml", "dep:serde"]
 
 [[bin]]

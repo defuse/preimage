@@ -23,6 +23,16 @@ pub trait HashAlgorithm: Send + Sync {
     fn name(&self) -> &str;
 }
 
+impl<T: HashAlgorithm + ?Sized> HashAlgorithm for Box<T> {
+    fn hash(&self, input: &[u8]) -> Option<Vec<u8>> {
+        (**self).hash(input)
+    }
+
+    fn name(&self) -> &str {
+        (**self).name()
+    }
+}
+
 /// Look up a built-in algorithm by its canonical name (case-sensitive).
 ///
 /// This is intended for the CLI binary. Library users should construct
