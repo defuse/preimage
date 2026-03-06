@@ -188,6 +188,73 @@ fn test_sort_triple_buffer_capacity() {
 }
 
 // ============================================================
+// File-based-only sorting (0 MiB buffer)
+// ============================================================
+//
+// With 0 MiB, the buffer holds 0 entries, so every partition goes
+// through file-based quicksort — no in-memory fast path at all.
+
+/// Sort with 0 MiB buffer (pure file-based), verify sorted, return entries.
+fn sort_file_only(entries: &[IndexEntry]) -> Vec<IndexEntry> {
+    let f = write_entries(entries);
+    let index = IndexFile::open(f.path());
+    index.sort(0, None).expect("sort failed");
+
+    assert!(
+        index.check_sorted(None).expect("check failed"),
+        "index should be sorted"
+    );
+
+    read_all_entries(f.path())
+}
+
+#[test]
+fn test_sort_file_only_small() {
+    let entries = random_entries(100, 200);
+    let before = fingerprint(&entries);
+    let sorted = sort_file_only(&entries);
+
+    assert_eq!(sorted.len(), 100);
+    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+}
+
+#[test]
+fn test_sort_file_only_with_collisions() {
+    // Mix of unique and identical prefixes — exercises file-based
+    // partitioning on equal keys without the in-memory fast path.
+    let mut entries = Vec::new();
+    let mut rng = SmallRng::seed_from_u64(201);
+
+    for i in 0..30 {
+        let mut prefix = [0u8; 8];
+        rng.fill(&mut prefix);
+        entries.push(IndexEntry::new(prefix, i));
+    }
+    let collision_prefix = [0x77; 8];
+    for i in 30..130 {
+        entries.push(IndexEntry::new(collision_prefix, i));
+    }
+
+    let before = fingerprint(&entries);
+    let sorted = sort_file_only(&entries);
+
+    assert_eq!(sorted.len(), 130);
+    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+}
+
+#[test]
+fn test_sort_file_only_reverse_sorted() {
+    let entries = reverse_sorted_entries(200);
+    let before = fingerprint(&entries);
+    let sorted = sort_file_only(&entries);
+
+    assert_eq!(sorted.len(), 200);
+    assert_eq!(fingerprint(&sorted), before);
+    assert_eq!(sorted[0].hash_prefix, [0, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(sorted[199].hash_prefix, [0, 0, 0, 0, 0, 0, 0, 199]);
+}
+
+// ============================================================
 // Small-scale tests with words.txt
 // ============================================================
 
