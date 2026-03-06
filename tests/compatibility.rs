@@ -27,7 +27,7 @@ fn build_sort_verify(algorithm: &dyn HashAlgorithm) -> NamedTempFile {
         algorithm.name()
     );
 
-    index.sort(1, None).expect("sort failed");
+    index.sort(1024 * 1024, None).expect("sort failed");
 
     assert!(
         index.check_sorted(None).expect("check failed"),

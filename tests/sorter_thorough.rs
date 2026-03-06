@@ -57,7 +57,7 @@ fn fingerprint(entries: &[IndexEntry]) -> HashMap<([u8; 8], u64), usize> {
 fn sort_and_verify(entries: &[IndexEntry]) -> Vec<IndexEntry> {
     let f = write_entries(entries);
     let index = IndexFile::open(f.path());
-    index.sort(1, None).expect("sort failed");
+    index.sort(1024 * 1024, None).expect("sort failed");
 
     assert!(
         index.check_sorted(None).expect("check failed"),
@@ -269,7 +269,7 @@ fn test_words_sort_all_in_memory() {
         .expect("build");
 
     let before = fingerprint(&read_all_entries(temp.path()));
-    index.sort(1, None).expect("sort failed");
+    index.sort(1024 * 1024, None).expect("sort failed");
 
     let after = read_all_entries(temp.path());
     assert!(index.check_sorted(None).expect("check"));
@@ -287,10 +287,10 @@ fn test_sort_already_sorted_preserves_exact_bytes() {
     let f = write_entries(&entries);
     let index = IndexFile::open(f.path());
 
-    index.sort(1, None).expect("first sort");
+    index.sort(1024 * 1024, None).expect("first sort");
     let bytes_after_first = std::fs::read(f.path()).expect("read");
 
-    index.sort(1, None).expect("second sort");
+    index.sort(1024 * 1024, None).expect("second sort");
     let bytes_after_second = std::fs::read(f.path()).expect("read");
 
     assert_eq!(
@@ -307,10 +307,10 @@ fn test_sort_already_sorted_preserves_exact_bytes_large() {
     let f = write_entries(&entries);
     let index = IndexFile::open(f.path());
 
-    index.sort(1, None).expect("first sort");
+    index.sort(1024 * 1024, None).expect("first sort");
     let sorted_once = read_all_entries(f.path());
 
-    index.sort(1, None).expect("second sort");
+    index.sort(1024 * 1024, None).expect("second sort");
     let sorted_twice = read_all_entries(f.path());
 
     // Can't guarantee byte-identical (randomized tie-breaking), but must be sorted
@@ -356,7 +356,7 @@ fn test_sort_all_identical_exceeding_buffer() {
     let f = write_entries(&entries);
     let index = IndexFile::open(f.path());
 
-    index.sort(1, None).expect("sort all-identical exceeding buffer");
+    index.sort(1024 * 1024, None).expect("sort all-identical exceeding buffer");
     assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
@@ -391,7 +391,7 @@ fn test_sort_reverse_sorted_exceeding_buffer() {
     let f = write_entries(&entries);
     let index = IndexFile::open(f.path());
 
-    index.sort(1, None).expect("sort reverse exceeding buffer");
+    index.sort(1024 * 1024, None).expect("sort reverse exceeding buffer");
     assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
@@ -515,7 +515,7 @@ fn test_sort_preserves_positions_file_based() {
     let before = fingerprint(&entries);
     let f = write_entries(&entries);
     let index = IndexFile::open(f.path());
-    index.sort(1, None).expect("sort");
+    index.sort(1024 * 1024, None).expect("sort");
     assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
@@ -535,7 +535,7 @@ fn test_sort_rejects_invalid_file_size() {
     f.flush().expect("flush");
 
     let index = IndexFile::open(f.path());
-    let result = index.sort(1, None);
+    let result = index.sort(1024 * 1024, None);
     assert!(result.is_err(), "should reject file size not divisible by 14");
 }
 

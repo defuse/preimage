@@ -8,13 +8,13 @@ use indicatif::ProgressBar;
 use crate::entry::{IndexEntry, ENTRY_SIZE};
 
 impl super::IndexFile {
-    /// Sort the index file in-place with the given memory budget.
+    /// Sort the index file in-place with the given memory budget (in bytes).
     ///
     /// Uses an in-memory buffer for partitions that fit, falling back to
     /// file-based quicksort for larger ones. **Do not interrupt** — the
     /// file will be corrupted if sorting is interrupted.
-    pub fn sort(&self, memory_mib: usize, progress: Option<&ProgressBar>) -> Result<()> {
-        let mut sorter = IndexSorter::new(memory_mib);
+    pub fn sort(&self, memory_bytes: usize, progress: Option<&ProgressBar>) -> Result<()> {
+        let mut sorter = IndexSorter::new(memory_bytes);
         sorter.sort_file(&self.path, progress)
     }
 
@@ -39,10 +39,9 @@ pub(crate) struct IndexSorter {
 }
 
 impl IndexSorter {
-    /// Create a new sorter with the given memory budget in MiB.
-    pub fn new(memory_mib: usize) -> Self {
-        let buf_bytes = memory_mib * 1024 * 1024;
-        let buf_count = buf_bytes / ENTRY_SIZE;
+    /// Create a new sorter with the given memory budget in bytes.
+    pub fn new(memory_bytes: usize) -> Self {
+        let buf_count = memory_bytes / ENTRY_SIZE;
         Self {
             buffer: vec![IndexEntry::new([0; 8], 0); buf_count],
             entries_sorted: 0,
@@ -303,7 +302,7 @@ mod tests {
         IndexBuilder::build(&Md5, &test_words_path(), output.path(), None)
             .expect("build failed");
 
-        let mut sorter = IndexSorter::new(1); // 1 MiB — more than enough
+        let mut sorter = IndexSorter::new(1024 * 1024);
         sorter.sort_file(output.path(), None).expect("sort failed");
 
         assert!(
@@ -319,7 +318,7 @@ mod tests {
         IndexBuilder::build(&Md5, &test_words_path(), output.path(), None)
             .expect("build failed");
 
-        let mut sorter = IndexSorter::new(1);
+        let mut sorter = IndexSorter::new(1024 * 1024);
         sorter.sort_file(output.path(), None).expect("first sort failed");
         sorter.sort_file(output.path(), None).expect("second sort failed");
 
@@ -357,7 +356,7 @@ mod tests {
     fn test_sort_empty_file() {
         let output = NamedTempFile::new().expect("temp file");
         // Empty file is valid (0 entries)
-        let mut sorter = IndexSorter::new(1);
+        let mut sorter = IndexSorter::new(1024 * 1024);
         sorter.sort_file(output.path(), None).expect("sort empty file should succeed");
     }
 
@@ -368,7 +367,7 @@ mod tests {
         let output = NamedTempFile::new().expect("temp file");
         IndexBuilder::build(&Md5, wordlist.path(), output.path(), None).expect("build");
 
-        let mut sorter = IndexSorter::new(1);
+        let mut sorter = IndexSorter::new(1024 * 1024);
         sorter.sort_file(output.path(), None).expect("sort single entry");
         assert!(check_sorted(output.path(), None).expect("check"));
     }

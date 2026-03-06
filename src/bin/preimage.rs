@@ -124,13 +124,13 @@ struct LookupArgs {
 fn parse_memory_size(s: &str) -> std::result::Result<usize, String> {
     let s = s.trim();
     let (num_str, multiplier) = if let Some(n) = s.strip_suffix('G') {
-        (n, 1024)
+        (n, 1024 * 1024 * 1024)
     } else if let Some(n) = s.strip_suffix('M') {
-        (n, 1)
+        (n, 1024 * 1024)
     } else if let Some(n) = s.strip_suffix('K') {
-        (n, 0) // handled below
+        (n, 1024)
     } else {
-        return Err(format!("missing suffix: use K, M, or G (e.g. 256M, 4G)"));
+        return Err("missing suffix: use K, M, or G (e.g. 256M, 4G)".to_string());
     };
 
     let num: f64 = num_str
@@ -140,11 +140,6 @@ fn parse_memory_size(s: &str) -> std::result::Result<usize, String> {
 
     if num < 0.0 {
         return Err("memory size cannot be negative".to_string());
-    }
-
-    // For K suffix, compute in KiB then convert to MiB (rounding down, minimum 0)
-    if s.ends_with('K') {
-        return Ok((num / 1024.0) as usize);
     }
 
     Ok((num * multiplier as f64) as usize)
@@ -220,7 +215,7 @@ fn cmd_create(algorithm_name: &str, wordlist: &PathBuf, output: &PathBuf) -> Res
     Ok(())
 }
 
-fn cmd_sort(memory_mib: usize, ram_only: bool, index_path: &PathBuf) -> Result<()> {
+fn cmd_sort(memory_bytes: usize, ram_only: bool, index_path: &PathBuf) -> Result<()> {
     eprintln!("WARNING: Do not interrupt this process. The index file will be corrupted if sorting is interrupted.");
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -234,7 +229,7 @@ fn cmd_sort(memory_mib: usize, ram_only: bool, index_path: &PathBuf) -> Result<(
     if ram_only {
         index.sort_ram_only(Some(&pb))?;
     } else {
-        index.sort(memory_mib, Some(&pb))?;
+        index.sort(memory_bytes, Some(&pb))?;
     }
     pb.finish_and_clear();
     println!("Index sort complete.");

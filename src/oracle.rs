@@ -153,7 +153,7 @@ mod tests {
     fn build_and_sort(algorithm: &dyn HashAlgorithm, wordlist: &Path) -> NamedTempFile {
         let index = NamedTempFile::new().expect("temp file");
         IndexBuilder::build(algorithm, wordlist, index.path(), None).expect("build");
-        let mut sorter = IndexSorter::new(1);
+        let mut sorter = IndexSorter::new(1024 * 1024);
         sorter.sort_file(index.path(), None).expect("sort");
         index
     }
