@@ -11,7 +11,7 @@ use preimage::{HashAlgorithm, HashResult, IndexFile, PreimageOracle};
 #[derive(Parser)]
 #[command(
     name = "preimage",
-    about = "Hash lookup table toolkit",
+    about = "Preimage creates hash indexes for wordlists, enabling speedy, space-efficient hash cracking.",
     flatten_help = true,
     after_help = "\
 WORKFLOW:
