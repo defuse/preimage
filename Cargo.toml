@@ -29,6 +29,7 @@ cli = ["dep:clap", "dep:toml", "dep:serde"]
 
 [[bin]]
 name = "preimage"
+path = "src/bin/preimage.rs"
 required-features = ["cli"]
 
 [dev-dependencies]
