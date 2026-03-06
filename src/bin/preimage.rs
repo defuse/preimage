@@ -82,7 +82,7 @@ WARNING: Sorting modifies the file in-place. Do NOT interrupt the process \
 (e.g. Ctrl+C) or the index file will be corrupted and must be regenerated.
 
 EXAMPLES:
-  Sort with default 256 MiB buffer:
+  Sort with default 2 GiB buffer:
     preimage sort md5.idx
 
   Sort with 4 GiB buffer:
@@ -92,7 +92,7 @@ EXAMPLES:
     preimage sort --ram md5.idx")]
     Sort {
         /// Sort buffer size (e.g. 256M, 4G, 1024K)
-        #[arg(short, long, default_value = "256M", value_parser = parse_memory_size)]
+        #[arg(short, long, default_value = "2G", value_parser = parse_memory_size)]
         memory: usize,
         /// Load entire file into RAM; error if it doesn't fit
         #[arg(long)]

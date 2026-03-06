@@ -34,6 +34,7 @@ impl super::IndexFile {
 /// of the original C `sortidx` program.
 pub(crate) struct IndexSorter {
     buffer: Vec<IndexEntry>,
+    memory_bytes: usize,
     entries_sorted: u64,
     total_entries: u64,
 }
@@ -41,9 +42,9 @@ pub(crate) struct IndexSorter {
 impl IndexSorter {
     /// Create a new sorter with the given memory budget in bytes.
     pub fn new(memory_bytes: usize) -> Self {
-        let buf_count = memory_bytes / ENTRY_SIZE;
         Self {
-            buffer: vec![IndexEntry::new([0; 8], 0); buf_count],
+            buffer: Vec::new(),
+            memory_bytes,
             entries_sorted: 0,
             total_entries: 0,
         }
@@ -57,11 +58,13 @@ impl IndexSorter {
             return Ok(());
         }
 
+        let buf_count = (self.memory_bytes / ENTRY_SIZE).min(num_entries as usize);
+        self.buffer = vec![IndexEntry::new([0; 8], 0); buf_count];
+
         self.entries_sorted = 0;
         self.total_entries = num_entries;
 
-        let buf_count = self.buffer.len() as i64;
-        self.quicksort_file(&mut file, 0, num_entries as i64 - 1, buf_count, progress)?;
+        self.quicksort_file(&mut file, 0, num_entries as i64 - 1, buf_count as i64, progress)?;
 
         Ok(())
     }
@@ -338,12 +341,7 @@ mod tests {
 
         // The words.txt has ~225 entries. Use a buffer of 10 entries to force
         // file-based partitioning.
-        let buf_count = 10;
-        let mut sorter = IndexSorter {
-            buffer: vec![IndexEntry::new([0; 8], 0); buf_count],
-            entries_sorted: 0,
-            total_entries: 0,
-        };
+        let mut sorter = IndexSorter::new(10 * ENTRY_SIZE);
         sorter.sort_file(output.path(), None).expect("sort with tiny buffer failed");
 
         assert!(
