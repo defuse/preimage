@@ -10,7 +10,6 @@ use preimage::checker::check_sorted;
 use preimage::hashing::*;
 use preimage::lookup::LookupTable;
 use preimage::HashAlgorithm;
-#[cfg(feature = "config")]
 use preimage::{PreimageOracle, HashResult};
 use preimage::sorter::IndexSorter;
 
@@ -104,7 +103,7 @@ EXAMPLES:
   Single-table lookup:
     preimage lookup -a md5 -i index.idx -d words.txt 5d41402abc4b2a76b9719d911017c592
 
-  Multi-table lookup (requires 'config' feature):
+  Multi-table lookup:
     preimage lookup --config tables.toml --early-exit 5d41402abc4b2a76b9719d911017c592"
 )]
 struct LookupArgs {
@@ -118,11 +117,9 @@ struct LookupArgs {
     #[arg(short, long)]
     dictionary: Option<PathBuf>,
     /// Config file path (for multi-table lookup)
-    #[cfg(feature = "config")]
     #[arg(short, long)]
     config: Option<PathBuf>,
     /// Stop after first full match per hash
-    #[cfg(feature = "config")]
     #[arg(long)]
     early_exit: bool,
     /// Hex-encoded hash(es) to look up
@@ -245,7 +242,6 @@ fn cmd_lookup(args: LookupArgs) -> Result<()> {
         bail!("No hashes provided. Pass one or more hex-encoded hashes, e.g.:\n  preimage lookup -a md5 -i index.idx -d words.txt 5d41402abc4b2a76b9719d911017c592");
     }
 
-    #[cfg(feature = "config")]
     if let Some(config_path) = &args.config {
         return lookup_with_config(config_path, &args.hashes, args.early_exit);
     }
@@ -255,10 +251,7 @@ fn cmd_lookup(args: LookupArgs) -> Result<()> {
     {
         lookup_single(alg_name, index_path, dict_path, &args.hashes)
     } else {
-        #[cfg(feature = "config")]
         bail!("Provide either --config for multi-table lookup, or --algorithm, --index, and --dictionary for single-table lookup.");
-        #[cfg(not(feature = "config"))]
-        bail!("Provide --algorithm, --index, and --dictionary for lookup.");
     }
 }
 
@@ -293,13 +286,11 @@ fn lookup_single(
     Ok(())
 }
 
-#[cfg(feature = "config")]
 #[derive(serde::Deserialize)]
 struct Config {
     table: Vec<TableConfig>,
 }
 
-#[cfg(feature = "config")]
 #[derive(serde::Deserialize)]
 struct TableConfig {
     label: String,
@@ -308,7 +299,6 @@ struct TableConfig {
     dictionary: PathBuf,
 }
 
-#[cfg(feature = "config")]
 fn lookup_with_config(config_path: &PathBuf, hashes: &[String], early_exit: bool) -> Result<()> {
     let config_str = std::fs::read_to_string(config_path)?;
     let config: Config = toml::from_str(&config_str)?;

@@ -18,16 +18,14 @@ digest = "0.10"
 memmap2 = "0.9"
 thiserror = "2"
 anyhow = "1"
-indicatif = { version = "0.17", optional = true }
+indicatif = "0.17"
 hex = "0.4"
 toml = { version = "0.8", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
-default = ["config", "cli"]
-build = ["dep:indicatif"]
-cli = ["build", "dep:clap"]
-config = ["dep:toml", "dep:serde"]
+default = ["cli"]
+cli = ["dep:clap", "dep:toml", "dep:serde"]
 
 [[bin]]
 name = "preimage"
