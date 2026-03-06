@@ -16,7 +16,7 @@ use preimage::{HashAlgorithm, HashResult, IndexFile, PreimageOracle};
     after_help = "\
 WORKFLOW:
   1. Create an index from a wordlist:
-       preimage create md5 wordlist.txt md5.idx
+       preimage create -a md5 -w wordlist.txt -o md5.idx
 
   2. Sort the index (WARNING: do not interrupt, corrupts the file):
        preimage sort md5.idx
@@ -64,13 +64,16 @@ enum Commands {
     /// Create an unsorted index from a wordlist
     #[command(after_help = "\
 EXAMPLE:
-  preimage create md5 wordlist.txt md5.idx")]
+  preimage create -a md5 -w wordlist.txt -o md5.idx")]
     Create {
         /// Hash algorithm name (run 'preimage listalgos' to list)
+        #[arg(short, long)]
         algorithm: String,
         /// Path to the wordlist file
+        #[arg(short, long)]
         wordlist: PathBuf,
         /// Path to the output index file
+        #[arg(short, long)]
         output: PathBuf,
     },
     /// Sort an index file in-place (DO NOT INTERRUPT)
