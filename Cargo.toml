@@ -40,6 +40,9 @@ name = "benchmark"
 path = "src/bin/benchmark.rs"
 required-features = ["bench"]
 
+[profile.release]
+debug = true
+
 [dev-dependencies]
 tempfile = "3"
 rand = { version = "0.8", features = ["small_rng"] }

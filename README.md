@@ -151,3 +151,51 @@ impl HashAlgorithm for MyHash {
     fn name(&self) -> &str { "my-hash" }
 }
 ```
+
+## Benchmarking
+
+The `benchmark` binary measures wordlist generation, index build, sort, and
+lookup throughput for synthetic wordlists of any size.
+
+```
+cargo run --release --features bench --bin benchmark -- --entries 1M --duration 10
+```
+
+Options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--entries <N>` | required | Wordlist size (`K`/`M`/`G` suffixes) |
+| `-a, --algorithm` | `md5` | Hash algorithm |
+| `-p, --parallel` | `1` | Lookup threads |
+| `-b, --batch` | `1000` | Queries per batch (for latency stats) |
+| `-d, --duration` | `10` | Seconds to run lookups |
+| `-m, --memory` | `2G` | Sort buffer size |
+| `--data-dir` | `benchmark_data` | Directory for generated files |
+| `--clean` | off | Delete existing files before run |
+
+Generated wordlists and indexes are cached in `--data-dir` and reused across
+runs unless `--clean` is passed.
+
+### Profiling with flamegraph
+
+Install [cargo-flamegraph](https://github.com/flamegraphs/flamegraph):
+
+```
+cargo install flamegraph
+```
+
+On Linux, allow perf events for non-root users (resets on reboot):
+
+```
+echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+```
+
+Generate a flamegraph (outputs `flamegraph.svg`):
+
+```
+cargo flamegraph --release --features bench --bin benchmark -- --entries 100M --duration 10 --clean
+```
+
+Open `flamegraph.svg` in a browser — it's interactive (click to zoom into call
+stacks).
