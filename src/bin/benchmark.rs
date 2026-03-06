@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 use humansize::{SizeFormatter, BINARY};
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
@@ -158,6 +159,18 @@ fn nth_word(n: u64) -> String {
     (0..len).map(|_| rng.sample(Alphanumeric) as char).collect()
 }
 
+fn progress_bar(total: u64, msg: &str) -> ProgressBar {
+    let pb = ProgressBar::new(total);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .expect("valid template")
+            .progress_chars("#>-"),
+    );
+    pb.set_message(msg.to_string());
+    pb
+}
+
 fn file_size(path: &Path) -> String {
     let size = fs::metadata(path).expect("failed to read file metadata").len();
     SizeFormatter::new(size, BINARY).to_string()
@@ -169,14 +182,21 @@ fn generate_wordlist(path: &Path, entries: u64) {
         return;
     }
 
+    let pb = progress_bar(entries, "Generating wordlist");
+
     let start = Instant::now();
     let file = fs::File::create(path).expect("failed to create wordlist file");
     let mut writer = BufWriter::new(file);
 
     for i in 0..entries {
         writeln!(writer, "{}", nth_word(i)).expect("failed to write word");
+        if i % 100_000 == 0 {
+            pb.set_position(i);
+        }
     }
     writer.flush().expect("failed to flush wordlist");
+    drop(writer);
+    pb.finish_and_clear();
 
     let elapsed = start.elapsed();
     println!(
@@ -196,9 +216,12 @@ fn build_index(algorithm: &dyn HashAlgorithm, wordlist_path: &Path, index_path: 
         return count;
     }
 
+    let pb = progress_bar(0, "Building index");
+
     let start = Instant::now();
-    let index = IndexFile::build(algorithm, wordlist_path, index_path, None)
+    let index = IndexFile::build(algorithm, wordlist_path, index_path, Some(&pb))
         .expect("failed to build index");
+    pb.finish_and_clear();
     let elapsed = start.elapsed();
 
     let count = index.entry_count().expect("failed to read entry count");
@@ -227,9 +250,18 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize) {
         return;
     }
 
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} [{elapsed_precise}] {msg}")
+            .expect("valid template"),
+    );
+    pb.enable_steady_tick(Duration::from_millis(100));
+
     let start = Instant::now();
     let index = IndexFile::open(index_path);
-    index.sort(memory_bytes, None).expect("failed to sort index");
+    index.sort(memory_bytes, Some(&pb)).expect("failed to sort index");
+    pb.finish_and_clear();
     let elapsed = start.elapsed();
 
     let secs = elapsed.as_secs_f64();
@@ -292,18 +324,36 @@ fn run_lookup_benchmark(
     );
 
     let stop = Arc::new(AtomicBool::new(false));
+    let query_count = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let algo_name = algorithm.name().to_string();
 
-    println!();
-    println!("=== Lookup Results ===");
+    let pb = ProgressBar::new(duration_secs);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}/{duration_precise}] [{bar:40.cyan/blue}] {msg}")
+            .expect("valid template")
+            .progress_chars("#>-"),
+    );
 
     let wall_start = Instant::now();
 
     let all_latencies: Vec<Vec<Duration>> = std::thread::scope(|s| {
-        // Timer thread
+        // Timer thread: updates progress bar every 250ms, sets stop flag at end
         let stop_clone = Arc::clone(&stop);
+        let query_count_clone = Arc::clone(&query_count);
+        let pb_clone = pb.clone();
         s.spawn(move || {
-            std::thread::sleep(Duration::from_secs(duration_secs));
+            let start = Instant::now();
+            let duration = Duration::from_secs(duration_secs);
+            while start.elapsed() < duration {
+                std::thread::sleep(Duration::from_millis(250));
+                let elapsed = start.elapsed();
+                let secs = elapsed.as_secs();
+                pb_clone.set_position(secs.min(duration_secs));
+                let queries = query_count_clone.load(Ordering::Relaxed);
+                let qps = queries as f64 / elapsed.as_secs_f64();
+                pb_clone.set_message(format!("{} queries, {:.0} queries/sec", format_count(queries), qps));
+            }
             stop_clone.store(true, Ordering::Relaxed);
         });
 
@@ -313,6 +363,7 @@ fn run_lookup_benchmark(
                 let table = Arc::clone(&table);
                 let stop = Arc::clone(&stop);
                 let algo_name = algo_name.clone();
+                let query_count = Arc::clone(&query_count);
 
                 s.spawn(move || {
                     let algo = preimage::algorithms::get_algorithm(&algo_name)
@@ -329,6 +380,7 @@ fn run_lookup_benchmark(
                             let _ = table.lookup(&hash_hex);
                         }
                         latencies.push(batch_start.elapsed());
+                        query_count.fetch_add(batch as u64, Ordering::Relaxed);
                     }
 
                     latencies
@@ -342,11 +394,14 @@ fn run_lookup_benchmark(
             .collect()
     });
 
+    pb.finish_and_clear();
+
     let wall_elapsed = wall_start.elapsed();
     let total_batches: usize = all_latencies.iter().map(|v| v.len()).sum();
     let total_lookups = total_batches as u64 * batch as u64;
     let throughput = total_lookups as f64 / wall_elapsed.as_secs_f64();
 
+    println!("=== Lookup Results ===");
     println!("Wall time:      {:.2}s", wall_elapsed.as_secs_f64());
     println!(
         "Total queries:  {} ({} batches x {})",
