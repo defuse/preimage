@@ -31,7 +31,7 @@ WORKFLOW:
        preimage lookup --config tables.toml <hash>...
 
   5. List supported algorithms:
-       preimage listalgos
+       preimage list
 
 Wordlists are arbitrary bytes separated by \\n characters.
 
@@ -66,7 +66,7 @@ enum Commands {
 EXAMPLE:
   preimage create -a md5 -w wordlist.txt -o md5.idx")]
     Create {
-        /// Hash algorithm name (run 'preimage listalgos' to list)
+        /// Hash algorithm name (run 'preimage list' to list)
         #[arg(short, long)]
         algorithm: String,
         /// Path to the wordlist file
@@ -111,7 +111,7 @@ EXAMPLE:
     /// Look up hashes against index(es)
     Lookup(LookupArgs),
     /// List supported hash algorithms
-    Listalgos,
+    List,
 }
 
 #[derive(clap::Args)]
@@ -180,7 +180,7 @@ fn main() -> Result<()> {
         Commands::Sort { memory, ram, index } => cmd_sort(memory, ram, &index),
         Commands::Check { index } => cmd_check(&index),
         Commands::Lookup(args) => cmd_lookup(args),
-        Commands::Listalgos => cmd_algorithms(),
+        Commands::List => cmd_algorithms(),
     }
 }
 
@@ -215,7 +215,7 @@ const ALGORITHM_NAMES: &[&str] = &[
 fn algorithm_from_name(name: &str) -> Box<dyn HashAlgorithm> {
     get_algorithm(name).unwrap_or_else(|| {
         eprintln!("Unknown algorithm: {name}");
-        eprintln!("Run 'preimage listalgos' to see supported algorithms.");
+        eprintln!("Run 'preimage list' to see supported algorithms.");
         process::exit(1);
     })
 }
