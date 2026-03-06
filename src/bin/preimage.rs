@@ -5,13 +5,8 @@ use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use preimage::builder::IndexBuilder;
-use preimage::checker::check_sorted;
 use preimage::hashing::*;
-use preimage::lookup::LookupTable;
-use preimage::HashAlgorithm;
-use preimage::{PreimageOracle, HashResult};
-use preimage::sorter::IndexSorter;
+use preimage::{HashAlgorithm, HashResult, IndexFile, PreimageOracle};
 
 #[derive(Parser)]
 #[command(
@@ -189,13 +184,14 @@ fn cmd_create(algorithm_name: &str, wordlist: &PathBuf, output: &PathBuf) -> Res
             .progress_chars("#>-"),
     );
 
-    let count = IndexBuilder::build(&*algorithm, wordlist, output, Some(&pb))?;
+    let index = IndexFile::build(&*algorithm, wordlist, output, Some(&pb))?;
     pb.finish_and_clear();
+    let count = index.entry_count()?;
     println!("Index creation complete. {count} entries written.");
     Ok(())
 }
 
-fn cmd_sort(memory_mib: usize, ram_only: bool, index: &PathBuf) -> Result<()> {
+fn cmd_sort(memory_mib: usize, ram_only: bool, index_path: &PathBuf) -> Result<()> {
     eprintln!("WARNING: Do not interrupt this process. The index file will be corrupted if sorting is interrupted.");
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -205,18 +201,18 @@ fn cmd_sort(memory_mib: usize, ram_only: bool, index: &PathBuf) -> Result<()> {
     );
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-    let mut sorter = IndexSorter::new(memory_mib);
+    let index = IndexFile::open(index_path);
     if ram_only {
-        sorter.sort_ram_only(index, Some(&pb))?;
+        index.sort_ram_only(Some(&pb))?;
     } else {
-        sorter.sort(index, Some(&pb))?;
+        index.sort(memory_mib, Some(&pb))?;
     }
     pb.finish_and_clear();
     println!("Index sort complete.");
     Ok(())
 }
 
-fn cmd_check(index: &PathBuf) -> Result<()> {
+fn cmd_check(index_path: &PathBuf) -> Result<()> {
     let pb = ProgressBar::new(0);
     pb.set_style(
         ProgressStyle::default_bar()
@@ -225,7 +221,8 @@ fn cmd_check(index: &PathBuf) -> Result<()> {
             .progress_chars("#>-"),
     );
 
-    let sorted = check_sorted(index, Some(&pb))?;
+    let index = IndexFile::open(index_path);
+    let sorted = index.check_sorted(Some(&pb))?;
     pb.finish_and_clear();
 
     if sorted {
@@ -262,7 +259,7 @@ fn lookup_single(
     hashes: &[String],
 ) -> Result<()> {
     let algorithm = algorithm_from_name(algorithm_name);
-    let table = LookupTable::open(algorithm, index_path, dict_path)?;
+    let table = IndexFile::open(index_path).into_lookup_table(algorithm, dict_path)?;
 
     for hash_hex in hashes {
         let matches = table.lookup(hash_hex)?;

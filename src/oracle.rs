@@ -154,7 +154,7 @@ mod tests {
         let index = NamedTempFile::new().expect("temp file");
         IndexBuilder::build(algorithm, wordlist, index.path(), None).expect("build");
         let mut sorter = IndexSorter::new(1);
-        sorter.sort(index.path(), None).expect("sort");
+        sorter.sort_file(index.path(), None).expect("sort");
         index
     }
 

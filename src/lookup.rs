@@ -62,6 +62,20 @@ impl<'a> LookupMatch<'a> {
     }
 }
 
+impl crate::IndexFile {
+    /// Open the index for hash lookups, consuming the `IndexFile`.
+    ///
+    /// The index must be sorted. The dictionary is the wordlist used to
+    /// create the index.
+    pub fn into_lookup_table(
+        self,
+        algorithm: impl HashAlgorithm + 'static,
+        dict_path: &Path,
+    ) -> Result<LookupTable> {
+        LookupTable::open(algorithm, &self.path, dict_path)
+    }
+}
+
 /// An mmap-backed sorted index for hash lookups.
 pub struct LookupTable {
     algorithm: Box<dyn HashAlgorithm>,
@@ -77,7 +91,7 @@ impl LookupTable {
     /// wordlist used to create the index.
     ///
     /// Accepts any `HashAlgorithm` implementor, including `Box<dyn HashAlgorithm>`.
-    pub fn open(
+    pub(crate) fn open(
         algorithm: impl HashAlgorithm + 'static,
         index_path: &Path,
         dict_path: &Path,
@@ -260,7 +274,7 @@ mod tests {
         let index = NamedTempFile::new().expect("temp file");
         IndexBuilder::build(algorithm, wordlist, index.path(), None).expect("build");
         let mut sorter = IndexSorter::new(1);
-        sorter.sort(index.path(), None).expect("sort");
+        sorter.sort_file(index.path(), None).expect("sort");
         index
     }
 

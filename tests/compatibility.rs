@@ -1,11 +1,8 @@
 use std::path::PathBuf;
 
-use preimage::builder::IndexBuilder;
-use preimage::checker::check_sorted;
 use preimage::hashing::*;
-use preimage::lookup::{LookupMatch, LookupTable};
-use preimage::oracle::{HashResult, PreimageOracle};
-use preimage::sorter::IndexSorter;
+use preimage::{HashAlgorithm, HashResult, IndexFile, LookupMatch};
+use preimage::PreimageOracle;
 use tempfile::NamedTempFile;
 
 fn test_data_path() -> PathBuf {
@@ -20,22 +17,25 @@ fn test_words_path() -> PathBuf {
 
 fn build_sort_verify(algorithm: &dyn HashAlgorithm) -> NamedTempFile {
     let words = test_words_path();
-    let index = NamedTempFile::new().expect("temp file");
+    let temp = NamedTempFile::new().expect("temp file");
 
-    let count = IndexBuilder::build(algorithm, &words, index.path(), None)
+    let index = IndexFile::build(algorithm, &words, temp.path(), None)
         .expect("build failed");
-    assert!(count > 0, "should create at least one entry for {}", algorithm.name());
+    assert!(
+        index.entry_count().expect("entry count") > 0,
+        "should create at least one entry for {}",
+        algorithm.name()
+    );
 
-    let mut sorter = IndexSorter::new(1);
-    sorter.sort(index.path(), None).expect("sort failed");
+    index.sort(1, None).expect("sort failed");
 
     assert!(
-        check_sorted(index.path(), None).expect("check failed"),
+        index.check_sorted(None).expect("check failed"),
         "index should be sorted for algorithm {}",
         algorithm.name()
     );
 
-    index
+    temp
 }
 
 /// Extract all Full-match plaintexts from a lookup result as byte slices.
@@ -69,7 +69,7 @@ fn assert_contains_word(plaintexts: &[&[u8]], word: &[u8], context: &str) {
 fn test_crack_against_php_md5_index() {
     let ref_idx = test_data_path().join("md5_sorted_reference.idx");
     let words = test_words_path();
-    let table = LookupTable::open(Md5, &ref_idx, &words).expect("open PHP md5 index");
+    let table = IndexFile::open(&ref_idx).into_lookup_table(Md5, &words).expect("open PHP md5 index");
 
     // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
     let matches = table.lookup("1f3870be274f6c49b3e31a0c6728957f").expect("lookup");
@@ -119,7 +119,7 @@ fn test_crack_against_php_md5_index() {
 fn test_crack_against_php_sha1_index() {
     let ref_idx = test_data_path().join("sha1_sorted_reference.idx");
     let words = test_words_path();
-    let table = LookupTable::open(Sha1, &ref_idx, &words).expect("open PHP sha1 index");
+    let table = IndexFile::open(&ref_idx).into_lookup_table(Sha1, &words).expect("open PHP sha1 index");
 
     // SHA1("apple") = d0be2dc421be4fcd0172e5afceea3970e2f3d940
     let matches = table.lookup("d0be2dc421be4fcd0172e5afceea3970e2f3d940").expect("lookup");
@@ -147,7 +147,7 @@ fn test_crack_against_php_sha1_index() {
 fn test_crack_against_php_ntlm_index() {
     let ref_idx = test_data_path().join("ntlm_sorted_reference.idx");
     let words = test_words_path();
-    let table = LookupTable::open(Ntlm, &ref_idx, &words).expect("open PHP NTLM index");
+    let table = IndexFile::open(&ref_idx).into_lookup_table(Ntlm, &words).expect("open PHP NTLM index");
 
     // NTLM("apple") = 5ebe7dfa074da8ee8aef1faa2bbde876
     let matches = table.lookup("5ebe7dfa074da8ee8aef1faa2bbde876").expect("lookup");
@@ -173,8 +173,9 @@ fn test_crack_against_php_ntlm_index() {
 fn test_rust_checker_validates_php_sorted_index() {
     for name in ["md5_sorted_reference.idx", "sha1_sorted_reference.idx", "ntlm_sorted_reference.idx"] {
         let path = test_data_path().join(name);
+        let index = IndexFile::open(&path);
         assert!(
-            check_sorted(&path, None).expect("check failed"),
+            index.check_sorted(None).expect("check failed"),
             "Rust checker should confirm PHP+C-sorted index {name} is sorted"
         );
     }
@@ -187,8 +188,8 @@ fn test_rust_checker_validates_php_sorted_index() {
 #[test]
 fn test_md5_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&Md5);
-    let table = LookupTable::open(Md5, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Md5);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Md5, &words).expect("open");
 
     let matches = table.lookup("1f3870be274f6c49b3e31a0c6728957f").expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
@@ -198,8 +199,8 @@ fn test_md5_end_to_end() {
 #[test]
 fn test_sha1_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&Sha1);
-    let table = LookupTable::open(Sha1, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Sha1);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Sha1, &words).expect("open");
 
     let matches = table.lookup("d0be2dc421be4fcd0172e5afceea3970e2f3d940").expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
@@ -209,8 +210,8 @@ fn test_sha1_end_to_end() {
 #[test]
 fn test_sha256_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&Sha256);
-    let table = LookupTable::open(Sha256, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Sha256);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Sha256, &words).expect("open");
 
     let matches = table.lookup("3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b").expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
@@ -220,8 +221,8 @@ fn test_sha256_end_to_end() {
 #[test]
 fn test_ntlm_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&Ntlm);
-    let table = LookupTable::open(Ntlm, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Ntlm);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Ntlm, &words).expect("open");
 
     let matches = table.lookup("5ebe7dfa074da8ee8aef1faa2bbde876").expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
@@ -231,8 +232,8 @@ fn test_ntlm_end_to_end() {
 #[test]
 fn test_lm_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&Lm);
-    let table = LookupTable::open(Lm, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Lm);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Lm, &words).expect("open");
 
     let expected_hash = hex::encode(Lm.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
@@ -243,8 +244,8 @@ fn test_lm_end_to_end() {
 #[test]
 fn test_md5md5_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&Md5Md5);
-    let table = LookupTable::open(Md5Md5, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Md5Md5);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Md5Md5, &words).expect("open");
 
     let expected_hash = hex::encode(Md5Md5.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
@@ -255,8 +256,8 @@ fn test_md5md5_end_to_end() {
 #[test]
 fn test_mysql41_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&MySql41);
-    let table = LookupTable::open(MySql41, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&MySql41);
+    let table = IndexFile::open(temp.path()).into_lookup_table(MySql41, &words).expect("open");
 
     let expected_hash = hex::encode(MySql41.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
@@ -267,8 +268,8 @@ fn test_mysql41_end_to_end() {
 #[test]
 fn test_whirlpool_end_to_end() {
     let words = test_words_path();
-    let index = build_sort_verify(&Whirlpool);
-    let table = LookupTable::open(Whirlpool, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Whirlpool);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Whirlpool, &words).expect("open");
 
     let expected_hash = hex::encode(Whirlpool.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
@@ -283,12 +284,12 @@ fn test_whirlpool_end_to_end() {
 #[test]
 fn test_oracle_multi_algorithm() {
     let words = test_words_path();
-    let md5_idx = build_sort_verify(&Md5);
-    let sha1_idx = build_sort_verify(&Sha1);
+    let md5_temp = build_sort_verify(&Md5);
+    let sha1_temp = build_sort_verify(&Sha1);
 
     let mut oracle = PreimageOracle::new();
-    oracle.register("md5", Md5, md5_idx.path(), &words).expect("register md5");
-    oracle.register("sha1", Sha1, sha1_idx.path(), &words).expect("register sha1");
+    oracle.register("md5", Md5, md5_temp.path(), &words).expect("register md5");
+    oracle.register("sha1", Sha1, sha1_temp.path(), &words).expect("register sha1");
 
     let md5_hash = hex::encode(Md5.hash(b"banana").expect("hash"));
     let sha1_hash = hex::encode(Sha1.hash(b"banana").expect("hash"));
@@ -320,8 +321,8 @@ fn test_oracle_multi_algorithm() {
 #[test]
 fn test_duplicate_hash_prefix_collision_block() {
     let words = test_words_path();
-    let index = build_sort_verify(&Md5);
-    let table = LookupTable::open(Md5, index.path(), &words).expect("open");
+    let temp = build_sort_verify(&Md5);
+    let table = IndexFile::open(temp.path()).into_lookup_table(Md5, &words).expect("open");
 
     let zzzz_hash = hex::encode(Md5.hash(b"ZzZz").expect("hash"));
     let matches = table.lookup(&zzzz_hash).expect("lookup");

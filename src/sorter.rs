@@ -7,12 +7,32 @@ use indicatif::ProgressBar;
 
 use crate::entry::{IndexEntry, ENTRY_SIZE};
 
+impl crate::IndexFile {
+    /// Sort the index file in-place with the given memory budget.
+    ///
+    /// Uses an in-memory buffer for partitions that fit, falling back to
+    /// file-based quicksort for larger ones. **Do not interrupt** — the
+    /// file will be corrupted if sorting is interrupted.
+    pub fn sort(&self, memory_mib: usize, progress: Option<&ProgressBar>) -> Result<()> {
+        let mut sorter = IndexSorter::new(memory_mib);
+        sorter.sort_file(&self.path, progress)
+    }
+
+    /// Sort the index file entirely in RAM.
+    ///
+    /// Allocates enough memory to hold the entire file. **Do not interrupt.**
+    pub fn sort_ram_only(&self, progress: Option<&ProgressBar>) -> Result<()> {
+        let mut sorter = IndexSorter::new(0);
+        sorter.sort_ram_only_file(&self.path, progress)
+    }
+}
+
 /// Sorts an index file in-place using a hybrid quicksort algorithm.
 ///
 /// Uses an in-memory buffer for partitions that fit in RAM, falling back
 /// to file-based quicksort for larger partitions. This matches the behavior
 /// of the original C `sortidx` program.
-pub struct IndexSorter {
+pub(crate) struct IndexSorter {
     buffer: Vec<IndexEntry>,
     entries_sorted: u64,
     total_entries: u64,
@@ -32,7 +52,7 @@ impl IndexSorter {
 
     /// Sort an index file in-place using hybrid quicksort (in-memory for
     /// partitions that fit, file-based for larger ones).
-    pub fn sort(&mut self, index_path: &Path, progress: Option<&ProgressBar>) -> Result<()> {
+    pub(crate) fn sort_file(&mut self, index_path: &Path, progress: Option<&ProgressBar>) -> Result<()> {
         let (mut file, num_entries) = self.open_and_validate(index_path)?;
         if num_entries <= 1 {
             return Ok(());
@@ -49,7 +69,7 @@ impl IndexSorter {
 
     /// Sort an index file entirely in RAM, allocating as much memory as
     /// needed to hold the entire file.
-    pub fn sort_ram_only(
+    pub(crate) fn sort_ram_only_file(
         &mut self,
         index_path: &Path,
         progress: Option<&ProgressBar>,
@@ -284,7 +304,7 @@ mod tests {
             .expect("build failed");
 
         let mut sorter = IndexSorter::new(1); // 1 MiB — more than enough
-        sorter.sort(output.path(), None).expect("sort failed");
+        sorter.sort_file(output.path(), None).expect("sort failed");
 
         assert!(
             check_sorted(output.path(), None).expect("check failed"),
@@ -300,8 +320,8 @@ mod tests {
             .expect("build failed");
 
         let mut sorter = IndexSorter::new(1);
-        sorter.sort(output.path(), None).expect("first sort failed");
-        sorter.sort(output.path(), None).expect("second sort failed");
+        sorter.sort_file(output.path(), None).expect("first sort failed");
+        sorter.sort_file(output.path(), None).expect("second sort failed");
 
         assert!(
             check_sorted(output.path(), None).expect("check failed"),
@@ -325,7 +345,7 @@ mod tests {
             entries_sorted: 0,
             total_entries: 0,
         };
-        sorter.sort(output.path(), None).expect("sort with tiny buffer failed");
+        sorter.sort_file(output.path(), None).expect("sort with tiny buffer failed");
 
         assert!(
             check_sorted(output.path(), None).expect("check failed"),
@@ -338,7 +358,7 @@ mod tests {
         let output = NamedTempFile::new().expect("temp file");
         // Empty file is valid (0 entries)
         let mut sorter = IndexSorter::new(1);
-        sorter.sort(output.path(), None).expect("sort empty file should succeed");
+        sorter.sort_file(output.path(), None).expect("sort empty file should succeed");
     }
 
     #[test]
@@ -349,7 +369,7 @@ mod tests {
         IndexBuilder::build(&Md5, wordlist.path(), output.path(), None).expect("build");
 
         let mut sorter = IndexSorter::new(1);
-        sorter.sort(output.path(), None).expect("sort single entry");
+        sorter.sort_file(output.path(), None).expect("sort single entry");
         assert!(check_sorted(output.path(), None).expect("check"));
     }
 }

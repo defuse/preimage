@@ -7,7 +7,24 @@ use indicatif::ProgressBar;
 use crate::entry::IndexEntry;
 use crate::hashing::HashAlgorithm;
 
-pub struct IndexBuilder;
+impl crate::IndexFile {
+    /// Create a new index file from a wordlist and hash algorithm.
+    ///
+    /// Hashes every line in the wordlist, writing 14-byte entries
+    /// (8-byte hash prefix + 6-byte LE wordlist position) to the output file.
+    /// The resulting index is unsorted — call [`sort`](Self::sort) next.
+    pub fn build(
+        algorithm: &dyn HashAlgorithm,
+        wordlist_path: &Path,
+        output_path: &Path,
+        progress: Option<&ProgressBar>,
+    ) -> Result<Self> {
+        IndexBuilder::build(algorithm, wordlist_path, output_path, progress)?;
+        Ok(crate::IndexFile { path: output_path.to_path_buf() })
+    }
+}
+
+pub(crate) struct IndexBuilder;
 
 impl IndexBuilder {
     /// Create an unsorted index from a wordlist and hash algorithm.

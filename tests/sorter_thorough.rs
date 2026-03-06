@@ -9,9 +9,8 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use preimage::checker::check_sorted;
 use preimage::entry::{IndexEntry, ENTRY_SIZE};
-use preimage::sorter::IndexSorter;
+use preimage::IndexFile;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use tempfile::NamedTempFile;
@@ -54,49 +53,14 @@ fn fingerprint(entries: &[IndexEntry]) -> HashMap<([u8; 8], u64), usize> {
     map
 }
 
-/// Sort with a given buffer capacity (in entries, not MiB), verify sorted,
-/// and return the sorted entries.
-fn sort_with_capacity(entries: &[IndexEntry], buf_entries: usize) -> Vec<IndexEntry> {
+/// Sort with 1 MiB buffer, verify sorted, and return the sorted entries.
+fn sort_and_verify(entries: &[IndexEntry]) -> Vec<IndexEntry> {
     let f = write_entries(entries);
-    let sorter = IndexSorter::new(1); // 1 MiB default
-
-    // Override buffer to exact capacity for precise boundary testing.
-    // We access the struct fields directly since they're pub(crate) — but
-    // IndexSorter fields are private, so we use a different approach:
-    // create a sorter with the right MiB to get at least buf_entries.
-    //
-    // Actually, for precise control, we need to compute the MiB that gives
-    // exactly buf_entries. But MiB rounding makes this imprecise for small
-    // values. Instead, just use the MiB-based API and accept the buffer
-    // might be slightly larger than intended.
-    //
-    // For very precise boundary tests, we use the test-only constructor.
-    drop(sorter);
-
-    // Compute exact MiB that will give us the desired buffer capacity.
-    // buf_entries * 14 bytes per entry / (1024*1024).
-    // For small values, this rounds to 0 MiB = 0 entries. In that case,
-    // we need at least 1 MiB.
-    let needed_bytes = buf_entries * ENTRY_SIZE;
-    let mib = if needed_bytes == 0 {
-        0
-    } else {
-        // We need exactly buf_entries, so compute the MiB that gives us that.
-        // entries_from_mib = (mib * 1024 * 1024) / 14
-        // We need entries_from_mib == buf_entries
-        // mib = ceil(buf_entries * 14 / (1024*1024))
-        // But we also can't exceed buf_entries, so we take the floor.
-        // Actually for boundary tests we need EXACTLY buf_entries.
-        // Since 1 MiB = 74898 entries and our test sizes are much smaller,
-        // 1 MiB always gives more than enough for small tests.
-        // For boundary tests, we'll test against a known entry count.
-        1
-    };
-    let mut sorter = IndexSorter::new(mib);
-    sorter.sort(f.path(), None).expect("sort failed");
+    let index = IndexFile::open(f.path());
+    index.sort(1, None).expect("sort failed");
 
     assert!(
-        check_sorted(f.path(), None).expect("check failed"),
+        index.check_sorted(None).expect("check failed"),
         "index should be sorted"
     );
 
@@ -165,7 +129,7 @@ fn test_sort_exactly_at_buffer_capacity() {
     // Should take the in-memory fast path.
     let entries = random_entries(ENTRIES_PER_MIB, 42);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, ENTRIES_PER_MIB);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), ENTRIES_PER_MIB);
     assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
@@ -179,7 +143,7 @@ fn test_sort_one_over_buffer_capacity() {
     let n = ENTRIES_PER_MIB + 1;
     let entries = random_entries(n, 43);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, ENTRIES_PER_MIB);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
     assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
@@ -192,7 +156,7 @@ fn test_sort_one_under_buffer_capacity() {
     let n = ENTRIES_PER_MIB - 1;
     let entries = random_entries(n, 44);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, ENTRIES_PER_MIB);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
     assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
@@ -205,7 +169,7 @@ fn test_sort_double_buffer_capacity() {
     let n = ENTRIES_PER_MIB * 2;
     let entries = random_entries(n, 45);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, ENTRIES_PER_MIB);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
     assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
@@ -217,71 +181,32 @@ fn test_sort_triple_buffer_capacity() {
     let n = ENTRIES_PER_MIB * 3;
     let entries = random_entries(n, 46);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, ENTRIES_PER_MIB);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
     assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
 }
 
 // ============================================================
-// Small-scale boundary tests with tiny buffers
+// Small-scale tests with words.txt
 // ============================================================
-//
-// These use the words.txt fixture (224 entries) with progressively
-// smaller buffers to force file-based partitioning at various depths.
 
-fn build_words_index() -> NamedTempFile {
+#[test]
+fn test_words_sort_all_in_memory() {
     let words = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("test_data")
         .join("words.txt");
-    let index = NamedTempFile::new().expect("temp file");
-    preimage::builder::IndexBuilder::build(
-        &preimage::hashing::Md5,
-        &words,
-        index.path(),
-        None,
-    )
-    .expect("build");
-    index
-}
+    let temp = NamedTempFile::new().expect("temp file");
+    let index = IndexFile::build(&preimage::hashing::Md5, &words, temp.path(), None)
+        .expect("build");
 
-/// Sort words.txt index with a custom buffer that holds exactly `n` entries.
-fn sort_words_with_buffer(buf_entries: usize) {
-    let index = build_words_index();
-    let before = fingerprint(&read_all_entries(index.path()));
+    let before = fingerprint(&read_all_entries(temp.path()));
+    index.sort(1, None).expect("sort failed");
 
-    // Create sorter with a specific MiB value that results in `buf_entries` capacity.
-    // For small buf_entries, use new(1) and the buffer will be much larger.
-    // To force small buffers, we need direct construction.
-    // Since IndexSorter fields are private, we use new() and accept that for small
-    // values the buffer is larger than needed. But the real test is ensuring
-    // file-based partition works, so let's generate enough entries.
-    //
-    // Actually, let's just use new(0) which gives 0 entries and should cause
-    // file partitioning for everything... but wait, 0 MiB = 0 entries,
-    // and the in-memory path requires size <= bufcount (0). So every partition
-    // of size >= 2 will go to file path. That tests file partitioning thoroughly.
-    //
-    // For the specific buffer-size tests, the important thing is we test with
-    // 1 MiB (all in-memory) and 0 MiB (all file-based), plus sizes around
-    // the 74898 boundary above.
-
-    // This test is parameterized by buf_entries but since we can't construct
-    // the sorter with an exact buffer count (private fields), we test the
-    // extremes: all-in-memory and all-on-disk.
-    let _ = buf_entries; // Used for documentation of intent
-    let mut sorter = IndexSorter::new(1);
-    sorter.sort(index.path(), None).expect("sort failed");
-
-    let after = read_all_entries(index.path());
-    assert!(check_sorted(index.path(), None).expect("check"));
+    let after = read_all_entries(temp.path());
+    assert!(index.check_sorted(None).expect("check"));
     assert_eq!(fingerprint(&after), before, "all entries must be preserved");
-}
-
-#[test]
-fn test_words_sort_all_in_memory() {
-    sort_words_with_buffer(1000); // 224 entries, buffer holds 1000
 }
 
 // ============================================================
@@ -293,12 +218,12 @@ fn test_sort_already_sorted_preserves_exact_bytes() {
     // Sort once, save exact bytes, sort again, compare byte-for-byte.
     let entries = random_entries(500, 50);
     let f = write_entries(&entries);
+    let index = IndexFile::open(f.path());
 
-    let mut sorter = IndexSorter::new(1);
-    sorter.sort(f.path(), None).expect("first sort");
+    index.sort(1, None).expect("first sort");
     let bytes_after_first = std::fs::read(f.path()).expect("read");
 
-    sorter.sort(f.path(), None).expect("second sort");
+    index.sort(1, None).expect("second sort");
     let bytes_after_second = std::fs::read(f.path()).expect("read");
 
     assert_eq!(
@@ -313,17 +238,17 @@ fn test_sort_already_sorted_preserves_exact_bytes_large() {
     let n = ENTRIES_PER_MIB + 100;
     let entries = random_entries(n, 51);
     let f = write_entries(&entries);
+    let index = IndexFile::open(f.path());
 
-    let mut sorter = IndexSorter::new(1);
-    sorter.sort(f.path(), None).expect("first sort");
+    index.sort(1, None).expect("first sort");
     let sorted_once = read_all_entries(f.path());
 
-    sorter.sort(f.path(), None).expect("second sort");
+    index.sort(1, None).expect("second sort");
     let sorted_twice = read_all_entries(f.path());
 
     // Can't guarantee byte-identical (randomized tie-breaking), but must be sorted
     // and contain the same entries.
-    assert!(check_sorted(f.path(), None).expect("check"));
+    assert!(index.check_sorted(None).expect("check"));
     assert_eq!(fingerprint(&sorted_once), fingerprint(&sorted_twice));
 }
 
@@ -337,7 +262,7 @@ fn test_sort_all_identical_small() {
     // must prevent O(n^2) behavior and produce a valid sorted output.
     let entries = identical_entries(100);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, 200);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), 100);
     assert_eq!(fingerprint(&sorted), before);
@@ -348,7 +273,7 @@ fn test_sort_all_identical_large() {
     // 10000 identical entries — stress test for randomized partitioning.
     let entries = identical_entries(10_000);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, 20_000);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), 10_000);
     assert_eq!(fingerprint(&sorted), before);
@@ -362,10 +287,10 @@ fn test_sort_all_identical_exceeding_buffer() {
     let n = ENTRIES_PER_MIB + 500;
     let entries = identical_entries(n);
     let f = write_entries(&entries);
+    let index = IndexFile::open(f.path());
 
-    let mut sorter = IndexSorter::new(1);
-    sorter.sort(f.path(), None).expect("sort all-identical exceeding buffer");
-    assert!(check_sorted(f.path(), None).expect("check"));
+    index.sort(1, None).expect("sort all-identical exceeding buffer");
+    assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
     assert_eq!(sorted.len(), n);
@@ -381,7 +306,7 @@ fn test_sort_all_identical_exceeding_buffer() {
 fn test_sort_reverse_sorted_small() {
     let entries = reverse_sorted_entries(100);
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, 200);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), 100);
     assert_eq!(fingerprint(&sorted), before);
@@ -397,10 +322,10 @@ fn test_sort_reverse_sorted_exceeding_buffer() {
     let entries = reverse_sorted_entries(n);
     let before = fingerprint(&entries);
     let f = write_entries(&entries);
+    let index = IndexFile::open(f.path());
 
-    let mut sorter = IndexSorter::new(1);
-    sorter.sort(f.path(), None).expect("sort reverse exceeding buffer");
-    assert!(check_sorted(f.path(), None).expect("check"));
+    index.sort(1, None).expect("sort reverse exceeding buffer");
+    assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
     assert_eq!(sorted.len(), n);
@@ -417,7 +342,7 @@ fn test_sort_two_entries_already_sorted() {
         IndexEntry::new([0x00; 8], 0),
         IndexEntry::new([0xFF; 8], 14),
     ];
-    let sorted = sort_with_capacity(&entries, 100);
+    let sorted = sort_and_verify(&entries);
     assert_eq!(sorted[0].hash_prefix, [0x00; 8]);
     assert_eq!(sorted[1].hash_prefix, [0xFF; 8]);
 }
@@ -428,7 +353,7 @@ fn test_sort_two_entries_reversed() {
         IndexEntry::new([0xFF; 8], 0),
         IndexEntry::new([0x00; 8], 14),
     ];
-    let sorted = sort_with_capacity(&entries, 100);
+    let sorted = sort_and_verify(&entries);
     assert_eq!(sorted[0].hash_prefix, [0x00; 8]);
     assert_eq!(sorted[1].hash_prefix, [0xFF; 8]);
 }
@@ -439,7 +364,7 @@ fn test_sort_two_entries_identical() {
         IndexEntry::new([0xAB; 8], 0),
         IndexEntry::new([0xAB; 8], 14),
     ];
-    let sorted = sort_with_capacity(&entries, 100);
+    let sorted = sort_and_verify(&entries);
     assert_eq!(sorted[0].hash_prefix, [0xAB; 8]);
     assert_eq!(sorted[1].hash_prefix, [0xAB; 8]);
     // Both entries must still be present (different positions)
@@ -465,7 +390,7 @@ fn test_sort_three_entries_all_orderings() {
     ];
 
     for (i, perm) in permutations.iter().enumerate() {
-        let sorted = sort_with_capacity(perm, 100);
+        let sorted = sort_and_verify(perm);
         assert_eq!(
             sorted[0].hash_prefix,
             [0x11; 8],
@@ -500,7 +425,7 @@ fn test_sort_preserves_positions() {
     }
 
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, 300);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), 200);
     assert_eq!(fingerprint(&sorted), before, "all (prefix, position) pairs must survive sorting");
@@ -522,9 +447,9 @@ fn test_sort_preserves_positions_file_based() {
 
     let before = fingerprint(&entries);
     let f = write_entries(&entries);
-    let mut sorter = IndexSorter::new(1);
-    sorter.sort(f.path(), None).expect("sort");
-    assert!(check_sorted(f.path(), None).expect("check"));
+    let index = IndexFile::open(f.path());
+    index.sort(1, None).expect("sort");
+    assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
     assert_eq!(sorted.len(), n);
@@ -542,8 +467,8 @@ fn test_sort_rejects_invalid_file_size() {
     f.write_all(&[0u8; 15]).expect("write");
     f.flush().expect("flush");
 
-    let mut sorter = IndexSorter::new(1);
-    let result = sorter.sort(f.path(), None);
+    let index = IndexFile::open(f.path());
+    let result = index.sort(1, None);
     assert!(result.is_err(), "should reject file size not divisible by 14");
 }
 
@@ -573,7 +498,7 @@ fn test_sort_mixed_identical_and_unique() {
     }
 
     let before = fingerprint(&entries);
-    let sorted = sort_with_capacity(&entries, 300);
+    let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), 250);
     assert_eq!(fingerprint(&sorted), before);
