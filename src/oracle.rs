@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::hashing::HashAlgorithm;
-use crate::lookup::{parse_hash_hex, LookupMatch, LookupTable};
+use crate::index::lookup::{parse_hash_hex, LookupMatch, LookupTable};
 
 /// A match from the oracle, wrapping a LookupMatch with table context.
 pub struct OracleMatch<'a> {
@@ -138,9 +138,9 @@ fn has_full_match(result: &HashResult<'_>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::IndexBuilder;
+    use crate::index::builder::IndexBuilder;
     use crate::hashing::{Md5, Sha1};
-    use crate::sorter::IndexSorter;
+    use crate::index::sorter::IndexSorter;
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {

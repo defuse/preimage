@@ -62,7 +62,7 @@ impl<'a> LookupMatch<'a> {
     }
 }
 
-impl crate::IndexFile {
+impl super::IndexFile {
     /// Open the index for hash lookups, consuming the `IndexFile`.
     ///
     /// The index must be sorted. The dictionary is the wordlist used to
@@ -258,9 +258,9 @@ fn read_word_at(file: &mut File, position: u64) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::IndexBuilder;
+    use crate::index::builder::IndexBuilder;
     use crate::hashing::Md5;
-    use crate::sorter::IndexSorter;
+    use crate::index::sorter::IndexSorter;
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {

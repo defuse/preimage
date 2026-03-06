@@ -7,7 +7,7 @@ use indicatif::ProgressBar;
 use crate::entry::IndexEntry;
 use crate::hashing::HashAlgorithm;
 
-impl crate::IndexFile {
+impl super::IndexFile {
     /// Create a new index file from a wordlist and hash algorithm.
     ///
     /// Hashes every line in the wordlist, writing 14-byte entries
@@ -20,7 +20,7 @@ impl crate::IndexFile {
         progress: Option<&ProgressBar>,
     ) -> Result<Self> {
         IndexBuilder::build(algorithm, wordlist_path, output_path, progress)?;
-        Ok(crate::IndexFile { path: output_path.to_path_buf() })
+        Ok(super::IndexFile { path: output_path.to_path_buf() })
     }
 }
 

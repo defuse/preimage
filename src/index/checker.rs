@@ -6,7 +6,7 @@ use indicatif::ProgressBar;
 
 use crate::entry::{IndexEntry, ENTRY_SIZE};
 
-impl crate::IndexFile {
+impl super::IndexFile {
     /// Check whether the index file is sorted by hash prefix.
     pub fn check_sorted(&self, progress: Option<&ProgressBar>) -> Result<bool> {
         check_sorted(&self.path, progress)

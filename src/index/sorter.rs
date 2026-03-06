@@ -7,7 +7,7 @@ use indicatif::ProgressBar;
 
 use crate::entry::{IndexEntry, ENTRY_SIZE};
 
-impl crate::IndexFile {
+impl super::IndexFile {
     /// Sort the index file in-place with the given memory budget.
     ///
     /// Uses an in-memory buffer for partitions that fit, falling back to
@@ -285,9 +285,9 @@ fn write_entry_at(file: &mut File, index: i64, entry: &IndexEntry) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::checker::check_sorted;
+    use crate::index::checker::check_sorted;
     use crate::hashing::Md5;
-    use crate::builder::IndexBuilder;
+    use crate::index::builder::IndexBuilder;
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {
