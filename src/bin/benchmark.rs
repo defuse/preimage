@@ -347,9 +347,14 @@ fn run_lookup_benchmark(
     let total_lookups = total_batches as u64 * batch as u64;
     let throughput = total_lookups as f64 / wall_elapsed.as_secs_f64();
 
-    println!("Wall time:    {:.2}s", wall_elapsed.as_secs_f64());
-    println!("Total lookups: {}", format_count(total_lookups));
-    println!("Throughput:   {:.0} lookups/sec", throughput);
+    println!("Wall time:      {:.2}s", wall_elapsed.as_secs_f64());
+    println!(
+        "Total queries:  {} ({} batches x {})",
+        format_count(total_lookups),
+        format_count(total_batches as u64),
+        format_count(batch as u64),
+    );
+    println!("Throughput:     {:.0} queries/sec", throughput);
 
     // Compute latency stats
     let mut all: Vec<Duration> = all_latencies.into_iter().flatten().collect();
@@ -365,7 +370,7 @@ fn run_lookup_benchmark(
     let p99 = all[((all.len() as f64 * 0.99) as usize).min(all.len() - 1)];
 
     println!();
-    println!("=== Batch Latency ({} lookups/batch) ===", format_count(batch as u64));
+    println!("=== Batch Latency ({} queries/batch) ===", format_count(batch as u64));
     println!("Min:     {}", format_duration(min));
     println!("Median:  {}", format_duration(median));
     println!("P95:     {}", format_duration(p95));
