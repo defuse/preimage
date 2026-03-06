@@ -243,9 +243,22 @@ fn build_index(algorithm: &dyn HashAlgorithm, wordlist_path: &Path, index_path: 
 
 fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize) {
     let check_pb = progress_bar(entry_count, "Checking sort");
+    let check_start = Instant::now();
     let index = IndexFile::open(index_path);
     let sorted = index.check_sorted(Some(&check_pb)).expect("failed to check sort status");
     check_pb.finish_and_clear();
+    let check_elapsed = check_start.elapsed();
+    let check_secs = check_elapsed.as_secs_f64();
+    let check_rate = entry_count as f64 / check_secs;
+    let check_per_entry_us = check_secs * 1_000_000.0 / entry_count as f64;
+
+    println!(
+        "Sort check:   {:.2}s ({} entries, {:.0} entries/sec, {:.2}us/entry)",
+        check_secs,
+        format_count(entry_count),
+        check_rate,
+        check_per_entry_us,
+    );
 
     if sorted {
         println!("Index sort:   already sorted, skipped");
