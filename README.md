@@ -119,6 +119,21 @@ dictionary = "/path/to/large.txt"
 preimage algorithms
 ```
 
+## Cargo features
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `cli` | yes | Builds the `preimage` CLI binary. Adds `clap`, `toml`, `serde`. |
+| `bench` | no | Builds the `benchmark` binary. Adds `rand`, `humansize`. |
+
+Use `default-features = false` when depending on preimage as a library to avoid
+pulling in CLI dependencies:
+
+```toml
+[dependencies]
+preimage = { path = "../preimage", default-features = false }
+```
+
 ## Library usage
 
 ```rust
