@@ -73,7 +73,7 @@ EXAMPLE:
         /// Path to the output index file
         output: PathBuf,
     },
-    /// Sort an index file in-place
+    /// Sort an index file in-place (DO NOT INTERRUPT)
     #[command(after_help = "\
 WARNING: Sorting modifies the file in-place. Do NOT interrupt the process \
 (e.g. Ctrl+C) or the index file will be corrupted and must be regenerated.
