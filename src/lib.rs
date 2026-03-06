@@ -1,3 +1,4 @@
+pub mod algorithms;
 pub mod hashing;
 pub mod entry;
 mod index;

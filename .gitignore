@@ -1,3 +1,4 @@
 /target/
 *.idx
 !tests/test_data/*.idx
+benchmark_data/
