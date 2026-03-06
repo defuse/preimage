@@ -131,10 +131,10 @@ fn main() {
     generate_wordlist(&wordlist_path, cli.entries);
 
     // Phase B: Build index
-    let entry_count = build_index(&*algorithm, &wordlist_path, &index_path);
+    let (entry_count, freshly_built) = build_index(&*algorithm, &wordlist_path, &index_path);
 
-    // Phase C: Sort index
-    sort_index(&index_path, entry_count, cli.memory);
+    // Phase C: Sort index (skip check if reusing a previously-sorted index)
+    sort_index(&index_path, entry_count, cli.memory, freshly_built);
 
     println!();
 
@@ -208,12 +208,13 @@ fn generate_wordlist(path: &Path, entries: u64) {
     );
 }
 
-fn build_index(algorithm: &dyn HashAlgorithm, wordlist_path: &Path, index_path: &Path) -> u64 {
+/// Returns (entry_count, freshly_built).
+fn build_index(algorithm: &dyn HashAlgorithm, wordlist_path: &Path, index_path: &Path) -> (u64, bool) {
     if index_path.exists() {
         let index = IndexFile::open(index_path);
         let count = index.entry_count().expect("failed to read entry count");
         println!("Index build:  {} ({}, exists, skipped)", index_path.display(), file_size(index_path));
-        return count;
+        return (count, false);
     }
 
     let pb = progress_bar(0, "Building index");
@@ -238,10 +239,16 @@ fn build_index(algorithm: &dyn HashAlgorithm, wordlist_path: &Path, index_path: 
         per_entry_us,
     );
 
-    count
+    (count, true)
 }
 
-fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize) {
+fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_built: bool) {
+    if !freshly_built {
+        println!("Sort check:   skipped (reusing existing index)");
+        println!("Index sort:   skipped (reusing existing index)");
+        return;
+    }
+
     let check_pb = progress_bar(entry_count, "Checking sort");
     let check_start = Instant::now();
     let index = IndexFile::open(index_path);
