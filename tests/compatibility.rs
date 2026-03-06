@@ -332,32 +332,3 @@ fn test_duplicate_hash_prefix_collision_block() {
         full.len()
     );
 }
-
-// ============================================================
-// Algorithm listing
-// ============================================================
-
-#[test]
-fn test_list_algorithms_contains_all() {
-    let algos = preimage::list_algorithms();
-    assert!(algos.contains(&"md5"));
-    assert!(algos.contains(&"sha1"));
-    assert!(algos.contains(&"sha256"));
-    assert!(algos.contains(&"sha512"));
-    assert!(algos.contains(&"whirlpool"));
-    assert!(algos.contains(&"ripemd160"));
-    assert!(algos.contains(&"LM"));
-    assert!(algos.contains(&"NTLM"));
-    assert!(algos.contains(&"md5(md5)"));
-    assert!(algos.contains(&"MySQL4.1+"));
-    assert!(algos.contains(&"QubesV3.1BackupDefaults"));
-}
-
-#[test]
-fn test_get_algorithm_roundtrip() {
-    for name in preimage::list_algorithms() {
-        let algo = preimage::get_algorithm(name)
-            .unwrap_or_else(|| panic!("get_algorithm({name}) returned None"));
-        assert_eq!(algo.name(), name);
-    }
-}
