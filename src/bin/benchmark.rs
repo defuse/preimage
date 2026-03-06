@@ -242,8 +242,10 @@ fn build_index(algorithm: &dyn HashAlgorithm, wordlist_path: &Path, index_path: 
 }
 
 fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize) {
+    let check_pb = progress_bar(entry_count, "Checking sort");
     let index = IndexFile::open(index_path);
-    let sorted = index.check_sorted(None).expect("failed to check sort status");
+    let sorted = index.check_sorted(Some(&check_pb)).expect("failed to check sort status");
+    check_pb.finish_and_clear();
 
     if sorted {
         println!("Index sort:   already sorted, skipped");
