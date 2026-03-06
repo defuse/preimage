@@ -12,6 +12,7 @@ use preimage::{HashAlgorithm, HashResult, IndexFile, PreimageOracle};
 #[command(
     name = "preimage",
     about = "Hash lookup table toolkit",
+    flatten_help = true,
     after_help = "\
 WORKFLOW:
   1. Create an index from a wordlist:
@@ -20,7 +21,7 @@ WORKFLOW:
   2. Sort the index (WARNING: do not interrupt, corrupts the file):
        preimage sort md5.idx
        preimage sort --ram md5.idx          # load entirely into RAM
-       preimage sort --memory 4096 md5.idx  # use 4 GiB buffer
+       preimage sort --memory 4G md5.idx     # use 4 GiB buffer
 
   3. Verify the index is sorted:
        preimage check md5.idx
@@ -30,9 +31,28 @@ WORKFLOW:
        preimage lookup --config tables.toml <hash>...
 
   5. List supported algorithms:
-       preimage algorithms
+       preimage listalgos
 
-Run 'preimage <command> --help' for detailed options."
+Wordlists are arbitrary bytes separated by \\n characters.
+
+EXAMPLE CONFIG (tables.toml):
+  [[table]]
+  label = \"md5-small\"
+  algorithm = \"md5\"
+  index = \"/data/md5-small.idx\"
+  dictionary = \"/data/small.txt\"
+
+  [[table]]
+  label = \"md5-large\"
+  algorithm = \"md5\"
+  index = \"/data/md5-large.idx\"
+  dictionary = \"/data/large.txt\"
+
+  [[table]]
+  label = \"sha1-small\"
+  algorithm = \"sha1\"
+  index = \"/data/sha1-small.idx\"
+  dictionary = \"/data/small.txt\""
 )]
 struct Cli {
     #[command(subcommand)]
@@ -46,7 +66,7 @@ enum Commands {
 EXAMPLE:
   preimage create md5 wordlist.txt md5.idx")]
     Create {
-        /// Hash algorithm name (run 'preimage algorithms' to list)
+        /// Hash algorithm name (run 'preimage listalgos' to list)
         algorithm: String,
         /// Path to the wordlist file
         wordlist: PathBuf,
@@ -68,7 +88,7 @@ EXAMPLES:
   Sort entirely in RAM:
     preimage sort --ram md5.idx")]
     Sort {
-        /// Sort buffer size (e.g. 256M, 4G, 1024K). Plain number means MiB.
+        /// Sort buffer size (e.g. 256M, 4G, 1024K)
         #[arg(short, long, default_value = "256M", value_parser = parse_memory_size)]
         memory: usize,
         /// Load entire file into RAM; error if it doesn't fit
@@ -88,7 +108,7 @@ EXAMPLE:
     /// Look up hashes against index(es)
     Lookup(LookupArgs),
     /// List supported hash algorithms
-    Algorithms,
+    Listalgos,
 }
 
 #[derive(clap::Args)]
@@ -157,7 +177,7 @@ fn main() -> Result<()> {
         Commands::Sort { memory, ram, index } => cmd_sort(memory, ram, &index),
         Commands::Check { index } => cmd_check(&index),
         Commands::Lookup(args) => cmd_lookup(args),
-        Commands::Algorithms => cmd_algorithms(),
+        Commands::Listalgos => cmd_algorithms(),
     }
 }
 
@@ -192,7 +212,7 @@ const ALGORITHM_NAMES: &[&str] = &[
 fn algorithm_from_name(name: &str) -> Box<dyn HashAlgorithm> {
     get_algorithm(name).unwrap_or_else(|| {
         eprintln!("Unknown algorithm: {name}");
-        eprintln!("Run `preimage algorithms` to see supported algorithms.");
+        eprintln!("Run 'preimage listalgos' to see supported algorithms.");
         process::exit(1);
     })
 }
