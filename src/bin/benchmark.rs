@@ -98,7 +98,7 @@ fn parse_memory_size(s: &str) -> Result<usize, String> {
 fn main() {
     let cli = Cli::parse();
 
-    let algorithm = get_algorithm(&cli.algorithm).unwrap_or_else(|| {
+    let algorithm: &'static dyn HashAlgorithm = get_algorithm(&cli.algorithm).unwrap_or_else(|| {
         eprintln!("Unknown algorithm: {}", cli.algorithm);
         std::process::exit(1);
     });
@@ -131,7 +131,7 @@ fn main() {
     generate_wordlist(&wordlist_path, cli.entries);
 
     // Phase B: Build index
-    let (entry_count, freshly_built) = build_index(&*algorithm, &wordlist_path, &index_path);
+    let (entry_count, freshly_built) = build_index(algorithm, &wordlist_path, &index_path);
 
     // Phase C: Sort index (skip check if reusing a previously-sorted index)
     sort_index(&index_path, entry_count, cli.memory, freshly_built);
@@ -140,7 +140,7 @@ fn main() {
 
     // Phase D: Lookup benchmark
     run_lookup_benchmark(
-        &*algorithm,
+        algorithm,
         &index_path,
         &wordlist_path,
         entry_count,
@@ -209,7 +209,7 @@ fn generate_wordlist(path: &Path, entries: u64) {
 }
 
 /// Returns (entry_count, freshly_built).
-fn build_index(algorithm: &dyn HashAlgorithm, wordlist_path: &Path, index_path: &Path) -> (u64, bool) {
+fn build_index(algorithm: &'static dyn HashAlgorithm, wordlist_path: &Path, index_path: &Path) -> (u64, bool) {
     if index_path.exists() {
         let index = IndexFile::open(index_path);
         let count = index.entry_count().expect("failed to read entry count");
@@ -302,7 +302,7 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_
 /// Generate a random lookup hash on the fly. 50% chance of a real hash (hit),
 /// 50% chance of random hex (miss). No pre-computed pool needed.
 fn generate_lookup_hash(
-    algorithm: &dyn HashAlgorithm,
+    algorithm: &'static dyn HashAlgorithm,
     rng: &mut SmallRng,
     entry_count: u64,
     hash_hex_len: usize,
@@ -323,7 +323,7 @@ fn generate_lookup_hash(
 }
 
 fn run_lookup_benchmark(
-    algorithm: &dyn HashAlgorithm,
+    algorithm: &'static dyn HashAlgorithm,
     index_path: &Path,
     wordlist_path: &Path,
     entry_count: u64,
@@ -336,18 +336,15 @@ fn run_lookup_benchmark(
     let hash_hex_len = sample_hash.len() * 2;
 
     // Open lookup table
-    let algo_for_table = preimage::algorithms::get_algorithm(algorithm.name())
-        .expect("algorithm must exist in registry");
     let index = IndexFile::open(index_path);
     let table = Arc::new(
         index
-            .into_lookup_table(algo_for_table, wordlist_path)
+            .into_lookup_table(algorithm, wordlist_path)
             .expect("failed to open lookup table"),
     );
 
     let stop = Arc::new(AtomicBool::new(false));
     let query_count = Arc::new(std::sync::atomic::AtomicU64::new(0));
-    let algo_name = algorithm.name().to_string();
 
     let pb = ProgressBar::new(duration_secs);
     pb.set_style(
@@ -384,12 +381,9 @@ fn run_lookup_benchmark(
             .map(|thread_id| {
                 let table = Arc::clone(&table);
                 let stop = Arc::clone(&stop);
-                let algo_name = algo_name.clone();
                 let query_count = Arc::clone(&query_count);
 
                 s.spawn(move || {
-                    let algo = preimage::algorithms::get_algorithm(&algo_name)
-                        .expect("algorithm must exist in registry");
                     let mut rng = SmallRng::seed_from_u64(42 + thread_id as u64);
                     let mut latencies = Vec::new();
 
@@ -397,7 +391,7 @@ fn run_lookup_benchmark(
                         let batch_start = Instant::now();
                         for _ in 0..batch {
                             let hash_hex = generate_lookup_hash(
-                                &*algo, &mut rng, entry_count, hash_hex_len,
+                                algorithm, &mut rng, entry_count, hash_hex_len,
                             );
                             let _ = table.lookup(&hash_hex);
                         }

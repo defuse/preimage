@@ -9,24 +9,24 @@ use crate::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
 use crate::hashes::HashAlgorithm;
 
 /// A match from looking up one hash against one index.
-pub enum LookupMatch<'a> {
+pub enum LookupMatch {
     /// All bytes of the recomputed hash match the queried hash.
     Full {
         /// The raw plaintext bytes from the wordlist.
         plaintext: Vec<u8>,
         recomputed_hash: Vec<u8>,
-        algorithm: &'a dyn HashAlgorithm,
+        algorithm: &'static dyn HashAlgorithm,
     },
     /// Only the 8-byte prefix matched; full hash differs.
     Partial {
         /// The raw plaintext bytes from the wordlist.
         plaintext: Vec<u8>,
         recomputed_hash: Vec<u8>,
-        algorithm: &'a dyn HashAlgorithm,
+        algorithm: &'static dyn HashAlgorithm,
     },
 }
 
-impl<'a> LookupMatch<'a> {
+impl LookupMatch {
     /// Get the plaintext bytes regardless of match type.
     pub fn plaintext(&self) -> &[u8] {
         match self {
@@ -49,7 +49,7 @@ impl<'a> LookupMatch<'a> {
     }
 
     /// Get the algorithm that produced this match.
-    pub fn algorithm(&self) -> &'a dyn HashAlgorithm {
+    pub fn algorithm(&self) -> &'static dyn HashAlgorithm {
         match self {
             LookupMatch::Full { algorithm, .. } => *algorithm,
             LookupMatch::Partial { algorithm, .. } => *algorithm,
@@ -69,7 +69,7 @@ impl super::IndexFile {
     /// create the index.
     pub fn into_lookup_table(
         self,
-        algorithm: impl HashAlgorithm + 'static,
+        algorithm: &'static dyn HashAlgorithm,
         dict_path: &Path,
     ) -> Result<LookupTable> {
         LookupTable::open(algorithm, &self.path, dict_path)
@@ -78,7 +78,7 @@ impl super::IndexFile {
 
 /// An mmap-backed sorted index for hash lookups.
 pub struct LookupTable {
-    algorithm: Box<dyn HashAlgorithm>,
+    algorithm: &'static dyn HashAlgorithm,
     index_mmap: Mmap,
     dict_path: PathBuf,
     entry_count: u64,
@@ -89,10 +89,8 @@ impl LookupTable {
     ///
     /// The index file must be sorted. The dictionary file is the original
     /// wordlist used to create the index.
-    ///
-    /// Accepts any `HashAlgorithm` implementor, including `Box<dyn HashAlgorithm>`.
     pub(crate) fn open(
-        algorithm: impl HashAlgorithm + 'static,
+        algorithm: &'static dyn HashAlgorithm,
         index_path: &Path,
         dict_path: &Path,
     ) -> Result<Self> {
@@ -114,7 +112,7 @@ impl LookupTable {
         let index_mmap = unsafe { Mmap::map(&index_file)? };
 
         Ok(Self {
-            algorithm: Box::new(algorithm),
+            algorithm,
             index_mmap,
             dict_path: dict_path.to_path_buf(),
             entry_count,
@@ -122,12 +120,12 @@ impl LookupTable {
     }
 
     /// Access the algorithm this table uses.
-    pub fn algorithm(&self) -> &dyn HashAlgorithm {
-        &*self.algorithm
+    pub fn algorithm(&self) -> &'static dyn HashAlgorithm {
+        self.algorithm
     }
 
     /// Look up a hex-encoded hash. Returns all prefix matches.
-    pub fn lookup(&self, hash_hex: &str) -> Result<Vec<LookupMatch<'_>>> {
+    pub fn lookup(&self, hash_hex: &str) -> Result<Vec<LookupMatch>> {
         let hash_bytes = parse_hash_hex(hash_hex)?;
 
         if self.entry_count == 0 {
@@ -164,13 +162,13 @@ impl LookupTable {
                     results.push(LookupMatch::Full {
                         plaintext: word,
                         recomputed_hash: recomputed,
-                        algorithm: &*self.algorithm,
+                        algorithm: self.algorithm,
                     });
                 } else {
                     results.push(LookupMatch::Partial {
                         plaintext: word,
                         recomputed_hash: recomputed,
-                        algorithm: &*self.algorithm,
+                        algorithm: self.algorithm,
                     });
                 }
             }
@@ -259,7 +257,7 @@ fn read_word_at(file: &mut File, position: u64) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::index::builder::IndexBuilder;
-    use crate::hashes::Md5;
+    use crate::hashes::{Md5, MD5};
     use crate::index::sorter::IndexSorter;
     use tempfile::NamedTempFile;
 
@@ -285,7 +283,7 @@ mod tests {
         std::io::Write::write_all(&mut wordlist, b"hello\n").expect("write");
 
         let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(Md5, index.path(), wordlist.path()).expect("open");
+        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
 
         let matches = table
             .lookup("5d41402abc4b2a76b9719d911017c592")
@@ -301,7 +299,7 @@ mod tests {
         std::io::Write::write_all(&mut wordlist, b"hello\n").expect("write");
 
         let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(Md5, index.path(), wordlist.path()).expect("open");
+        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
 
         let matches = table
             .lookup("ffffffffffffffffffffffffffffffff")
@@ -313,7 +311,7 @@ mod tests {
     fn test_lookup_from_test_words() {
         let index = build_and_sort(&Md5, &test_words_path());
         let table =
-            LookupTable::open(Md5, index.path(), &test_words_path()).expect("open");
+            LookupTable::open(MD5, index.path(), &test_words_path()).expect("open");
 
         // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
         let matches = table
@@ -329,7 +327,7 @@ mod tests {
         let mut wordlist = NamedTempFile::new().expect("temp file");
         std::io::Write::write_all(&mut wordlist, b"hello\n").expect("write");
         let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(Md5, index.path(), wordlist.path()).expect("open");
+        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
 
         assert!(table.lookup("xyz").is_err());
         assert!(table.lookup("5d4140").is_err()); // too short
@@ -340,7 +338,7 @@ mod tests {
         let mut wordlist = NamedTempFile::new().expect("temp file");
         std::io::Write::write_all(&mut wordlist, b"").expect("write");
         let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(Md5, index.path(), wordlist.path()).expect("open");
+        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
 
         let matches = table
             .lookup("5d41402abc4b2a76b9719d911017c592")
@@ -355,7 +353,7 @@ mod tests {
         std::io::Write::write_all(&mut wordlist, &[0xFF, 0xFE, b'\n']).expect("write");
 
         let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(Md5, index.path(), wordlist.path()).expect("open");
+        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
 
         // MD5 of raw bytes [0xFF, 0xFE]
         let hash = hex::encode(Md5.hash(&[0xFF, 0xFE]).expect("md5"));

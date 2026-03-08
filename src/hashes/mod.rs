@@ -8,6 +8,23 @@ pub use ntlm::Ntlm;
 pub use lm::Lm;
 pub use compound::{Md5Md5, MySql41, QubesV31};
 
+// Static algorithm references — zero heap allocation, just a pointer to a vtable.
+pub static MD2: &dyn HashAlgorithm = &Md2;
+pub static MD4: &dyn HashAlgorithm = &Md4;
+pub static MD5: &dyn HashAlgorithm = &Md5;
+pub static SHA1: &dyn HashAlgorithm = &Sha1;
+pub static SHA224: &dyn HashAlgorithm = &Sha224;
+pub static SHA256: &dyn HashAlgorithm = &Sha256;
+pub static SHA384: &dyn HashAlgorithm = &Sha384;
+pub static SHA512: &dyn HashAlgorithm = &Sha512;
+pub static WHIRLPOOL: &dyn HashAlgorithm = &Whirlpool;
+pub static RIPEMD160: &dyn HashAlgorithm = &Ripemd160;
+pub static LM: &dyn HashAlgorithm = &Lm;
+pub static NTLM: &dyn HashAlgorithm = &Ntlm;
+pub static MD5MD5: &dyn HashAlgorithm = &Md5Md5;
+pub static MYSQL41: &dyn HashAlgorithm = &MySql41;
+pub static QUBESV31: &dyn HashAlgorithm = &QubesV31;
+
 /// Trait for hash algorithm implementations.
 ///
 /// Implementations must be `Send + Sync` for use in multi-table lookups.

@@ -1,24 +1,29 @@
-use crate::hashes::*;
-use crate::HashAlgorithm;
+use crate::hashes::{
+    HashAlgorithm,
+    MD2, MD4, MD5, SHA1, SHA224, SHA256, SHA384, SHA512,
+    WHIRLPOOL, RIPEMD160, LM, NTLM, MD5MD5, MYSQL41, QUBESV31,
+};
 
 /// Look up a built-in algorithm by its CLI name (case-sensitive).
-pub fn get_algorithm(name: &str) -> Option<Box<dyn HashAlgorithm>> {
+///
+/// Returns a static reference — no heap allocation.
+pub fn get_algorithm(name: &str) -> Option<&'static dyn HashAlgorithm> {
     match name {
-        "md2" => Some(Box::new(Md2)),
-        "md4" => Some(Box::new(Md4)),
-        "md5" => Some(Box::new(Md5)),
-        "sha1" => Some(Box::new(Sha1)),
-        "sha224" => Some(Box::new(Sha224)),
-        "sha256" => Some(Box::new(Sha256)),
-        "sha384" => Some(Box::new(Sha384)),
-        "sha512" => Some(Box::new(Sha512)),
-        "whirlpool" => Some(Box::new(Whirlpool)),
-        "ripemd160" => Some(Box::new(Ripemd160)),
-        "NTLM" => Some(Box::new(Ntlm)),
-        "LM" => Some(Box::new(Lm)),
-        "md5(md5)" => Some(Box::new(Md5Md5)),
-        "MySQL4.1+" => Some(Box::new(MySql41)),
-        "QubesV3.1BackupDefaults" => Some(Box::new(QubesV31)),
+        "md2" => Some(MD2),
+        "md4" => Some(MD4),
+        "md5" => Some(MD5),
+        "sha1" => Some(SHA1),
+        "sha224" => Some(SHA224),
+        "sha256" => Some(SHA256),
+        "sha384" => Some(SHA384),
+        "sha512" => Some(SHA512),
+        "whirlpool" => Some(WHIRLPOOL),
+        "ripemd160" => Some(RIPEMD160),
+        "NTLM" => Some(NTLM),
+        "LM" => Some(LM),
+        "md5(md5)" => Some(MD5MD5),
+        "MySQL4.1+" => Some(MYSQL41),
+        "QubesV3.1BackupDefaults" => Some(QUBESV31),
         _ => None,
     }
 }

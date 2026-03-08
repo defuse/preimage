@@ -10,7 +10,7 @@ pub struct OracleMatch<'a> {
     /// Which table produced this match (e.g. "md5-small").
     pub table_label: &'a str,
     /// The match itself (already contains the algorithm reference).
-    pub lookup_match: LookupMatch<'a>,
+    pub lookup_match: LookupMatch,
 }
 
 /// Result for one queried hash across all tables.
@@ -44,12 +44,10 @@ impl PreimageOracle {
     }
 
     /// Register a lookup table.
-    ///
-    /// Accepts any `HashAlgorithm` implementor, including `Box<dyn HashAlgorithm>`.
     pub fn register(
         &mut self,
         label: &str,
-        algorithm: impl HashAlgorithm + 'static,
+        algorithm: &'static dyn HashAlgorithm,
         index_path: &Path,
         dict_path: &Path,
     ) -> Result<()> {
@@ -139,7 +137,7 @@ fn has_full_match(result: &HashResult<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::index::builder::IndexBuilder;
-    use crate::hashes::{Md5, Sha1};
+    use crate::hashes::{MD5, SHA1, Md5, Sha1};
     use crate::index::sorter::IndexSorter;
     use tempfile::NamedTempFile;
 
@@ -165,7 +163,7 @@ mod tests {
 
         let mut oracle = PreimageOracle::new();
         oracle
-            .register("md5", Md5, idx.path(), &words)
+            .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
         // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
@@ -186,10 +184,10 @@ mod tests {
 
         let mut oracle = PreimageOracle::new();
         oracle
-            .register("md5", Md5, md5_idx.path(), &words)
+            .register("md5", MD5, md5_idx.path(), &words)
             .expect("register md5");
         oracle
-            .register("sha1", Sha1, sha1_idx.path(), &words)
+            .register("sha1", SHA1, sha1_idx.path(), &words)
             .expect("register sha1");
 
         // MD5("apple")
@@ -215,10 +213,10 @@ mod tests {
 
         let mut oracle = PreimageOracle::new();
         oracle
-            .register("md5-first", Md5, idx1.path(), &words)
+            .register("md5-first", MD5, idx1.path(), &words)
             .expect("register");
         oracle
-            .register("md5-second", Md5, idx2.path(), &words)
+            .register("md5-second", MD5, idx2.path(), &words)
             .expect("register");
 
         // With early_exit, should only find in first table
@@ -242,7 +240,7 @@ mod tests {
 
         let mut oracle = PreimageOracle::new();
         oracle
-            .register("md5", Md5, idx.path(), &words)
+            .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
         let results = oracle.crack(&["ffffffffffffffffffffffffffffffff"], false);
@@ -260,7 +258,7 @@ mod tests {
 
         let mut oracle = PreimageOracle::new();
         oracle
-            .register("md5", Md5, idx.path(), &words)
+            .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
         let results = oracle.crack(
@@ -286,7 +284,7 @@ mod tests {
 
         let mut oracle = PreimageOracle::new();
         oracle
-            .register("md5", Md5, idx.path(), &words)
+            .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
         let results = oracle.crack(
@@ -317,7 +315,7 @@ mod tests {
 
         let mut oracle = PreimageOracle::new();
         oracle
-            .register("md5", Md5, idx.path(), &words)
+            .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
         let results = oracle.crack(

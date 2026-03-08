@@ -184,7 +184,7 @@ fn main() -> Result<()> {
     }
 }
 
-fn algorithm_from_name(name: &str) -> Box<dyn HashAlgorithm> {
+fn algorithm_from_name(name: &str) -> &'static dyn HashAlgorithm {
     get_algorithm(name).unwrap_or_else(|| {
         eprintln!("Unknown algorithm: {name}");
         eprintln!("Run 'preimage list' to see supported algorithms.");
@@ -203,7 +203,7 @@ fn cmd_create(algorithm_name: &str, wordlist: &PathBuf, output: &PathBuf) -> Res
             .progress_chars("#>-"),
     );
 
-    let index = IndexFile::build(&*algorithm, wordlist, output, Some(&pb))?;
+    let index = IndexFile::build(algorithm, wordlist, output, Some(&pb))?;
     pb.finish_and_clear();
     let count = index.entry_count()?;
     println!("Index creation complete. {count} entries written.");
