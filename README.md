@@ -137,7 +137,7 @@ preimage = { path = "../preimage", default-features = false }
 ## Library usage
 
 ```rust
-use preimage::hashing::Md5;
+use preimage::hashes::Md5;
 use preimage::lookup::LookupTable;
 use preimage::oracle::PreimageOracle;
 
@@ -154,7 +154,7 @@ let results = oracle.crack(&["5d41402abc4b2a76b9719d911017c592"], false);
 Custom hash algorithms can be added by implementing the `HashAlgorithm` trait:
 
 ```rust
-use preimage::hashing::HashAlgorithm;
+use preimage::hashes::HashAlgorithm;
 
 struct MyHash;
 

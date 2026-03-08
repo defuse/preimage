@@ -288,7 +288,7 @@ fn write_entry_at(file: &mut File, index: i64, entry: &IndexEntry) -> Result<()>
 mod tests {
     use super::*;
     use crate::index::checker::check_sorted;
-    use crate::hashing::Md5;
+    use crate::hashes::Md5;
     use crate::index::builder::IndexBuilder;
     use tempfile::NamedTempFile;
 

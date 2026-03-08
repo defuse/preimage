@@ -6,7 +6,7 @@ use anyhow::{bail, Result};
 use memmap2::Mmap;
 
 use crate::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
-use crate::hashing::HashAlgorithm;
+use crate::hashes::HashAlgorithm;
 
 /// A match from looking up one hash against one index.
 pub enum LookupMatch<'a> {
@@ -259,7 +259,7 @@ fn read_word_at(file: &mut File, position: u64) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::index::builder::IndexBuilder;
-    use crate::hashing::Md5;
+    use crate::hashes::Md5;
     use crate::index::sorter::IndexSorter;
     use tempfile::NamedTempFile;
 

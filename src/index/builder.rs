@@ -5,7 +5,7 @@ use anyhow::Result;
 use indicatif::ProgressBar;
 
 use crate::entry::IndexEntry;
-use crate::hashing::HashAlgorithm;
+use crate::hashes::HashAlgorithm;
 
 impl super::IndexFile {
     /// Create a new index file from a wordlist and hash algorithm.
@@ -110,7 +110,7 @@ impl IndexBuilder {
 mod tests {
     use super::*;
     use crate::entry::ENTRY_SIZE;
-    use crate::hashing::Md5;
+    use crate::hashes::Md5;
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {

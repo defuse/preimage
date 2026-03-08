@@ -1,4 +1,4 @@
-use crate::hashing::*;
+use crate::hashes::*;
 use crate::HashAlgorithm;
 
 /// Look up a built-in algorithm by its CLI name (case-sensitive).

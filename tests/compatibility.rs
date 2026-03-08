@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use preimage::hashing::*;
+use preimage::hashes::*;
 use preimage::{HashAlgorithm, HashResult, IndexFile, LookupMatch};
 use preimage::PreimageOracle;
 use tempfile::NamedTempFile;
