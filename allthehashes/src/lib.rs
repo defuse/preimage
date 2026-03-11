@@ -27,7 +27,7 @@ pub use checksums::{Adler32, Crc32, Crc32b, Crc32c, Fnv132, Fnv164, Fnv1a32, Fnv
 
 // Wrapper structs for custom hash implementations
 macro_rules! custom_hash {
-    ($struct_name:ident, $php_name:expr, $func:path, $output_size:expr) => {
+    ($struct_name:ident, $php_name:expr, $func:path) => {
         pub struct $struct_name;
         impl HashAlgorithm for $struct_name {
             fn hash(&self, input: &[u8]) -> Option<Vec<u8>> {
@@ -41,33 +41,33 @@ macro_rules! custom_hash {
 }
 
 // Snefru (snefru and snefru256 are the same algorithm)
-custom_hash!(Snefru, "snefru", snefru::snefru256, 32);
-custom_hash!(Snefru256, "snefru256", snefru::snefru256, 32);
+custom_hash!(Snefru, "snefru", snefru::snefru256);
+custom_hash!(Snefru256, "snefru256", snefru::snefru256);
 
 // Tiger variants
-custom_hash!(Tiger128_3, "tiger128,3", tiger::tiger128_3, 16);
-custom_hash!(Tiger160_3, "tiger160,3", tiger::tiger160_3, 20);
-custom_hash!(Tiger192_3, "tiger192,3", tiger::tiger192_3, 24);
-custom_hash!(Tiger128_4, "tiger128,4", tiger::tiger128_4, 16);
-custom_hash!(Tiger160_4, "tiger160,4", tiger::tiger160_4, 20);
-custom_hash!(Tiger192_4, "tiger192,4", tiger::tiger192_4, 24);
+custom_hash!(Tiger128_3, "tiger128,3", tiger::tiger128_3);
+custom_hash!(Tiger160_3, "tiger160,3", tiger::tiger160_3);
+custom_hash!(Tiger192_3, "tiger192,3", tiger::tiger192_3);
+custom_hash!(Tiger128_4, "tiger128,4", tiger::tiger128_4);
+custom_hash!(Tiger160_4, "tiger160,4", tiger::tiger160_4);
+custom_hash!(Tiger192_4, "tiger192,4", tiger::tiger192_4);
 
-// HAVAL variants (output_bits, passes)
-custom_hash!(Haval128_3, "haval128,3", haval::haval128_3, 16);
-custom_hash!(Haval128_4, "haval128,4", haval::haval128_4, 16);
-custom_hash!(Haval128_5, "haval128,5", haval::haval128_5, 16);
-custom_hash!(Haval160_3, "haval160,3", haval::haval160_3, 20);
-custom_hash!(Haval160_4, "haval160,4", haval::haval160_4, 20);
-custom_hash!(Haval160_5, "haval160,5", haval::haval160_5, 20);
-custom_hash!(Haval192_3, "haval192,3", haval::haval192_3, 24);
-custom_hash!(Haval192_4, "haval192,4", haval::haval192_4, 24);
-custom_hash!(Haval192_5, "haval192,5", haval::haval192_5, 24);
-custom_hash!(Haval224_3, "haval224,3", haval::haval224_3, 28);
-custom_hash!(Haval224_4, "haval224,4", haval::haval224_4, 28);
-custom_hash!(Haval224_5, "haval224,5", haval::haval224_5, 28);
-custom_hash!(Haval256_3, "haval256,3", haval::haval256_3, 32);
-custom_hash!(Haval256_4, "haval256,4", haval::haval256_4, 32);
-custom_hash!(Haval256_5, "haval256,5", haval::haval256_5, 32);
+// HAVAL variants
+custom_hash!(Haval128_3, "haval128,3", haval::haval128_3);
+custom_hash!(Haval128_4, "haval128,4", haval::haval128_4);
+custom_hash!(Haval128_5, "haval128,5", haval::haval128_5);
+custom_hash!(Haval160_3, "haval160,3", haval::haval160_3);
+custom_hash!(Haval160_4, "haval160,4", haval::haval160_4);
+custom_hash!(Haval160_5, "haval160,5", haval::haval160_5);
+custom_hash!(Haval192_3, "haval192,3", haval::haval192_3);
+custom_hash!(Haval192_4, "haval192,4", haval::haval192_4);
+custom_hash!(Haval192_5, "haval192,5", haval::haval192_5);
+custom_hash!(Haval224_3, "haval224,3", haval::haval224_3);
+custom_hash!(Haval224_4, "haval224,4", haval::haval224_4);
+custom_hash!(Haval224_5, "haval224,5", haval::haval224_5);
+custom_hash!(Haval256_3, "haval256,3", haval::haval256_3);
+custom_hash!(Haval256_4, "haval256,4", haval::haval256_4);
+custom_hash!(Haval256_5, "haval256,5", haval::haval256_5);
 
 // =============================================================================
 // Static algorithm references
