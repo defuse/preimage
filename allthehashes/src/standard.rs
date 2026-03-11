@@ -1,5 +1,5 @@
 use digest::Digest;
-use super::HashAlgorithm;
+use crate::HashAlgorithm;
 
 macro_rules! standard_hash {
     ($rust_name:ident, $php_name:expr, $hasher:ty) => {

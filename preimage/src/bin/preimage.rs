@@ -5,8 +5,7 @@ use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use preimage::algorithms::{get_algorithm, ALGORITHM_NAMES};
-use preimage::{HashAlgorithm, HashResult, IndexFile, PreimageOracle};
+use preimage::{get_algorithm, HashAlgorithm, HashResult, IndexFile, PreimageOracle, ALGORITHM_NAMES};
 
 #[derive(Parser)]
 #[command(

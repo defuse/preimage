@@ -11,8 +11,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-use preimage::algorithms::get_algorithm;
-use preimage::{HashAlgorithm, IndexFile};
+use preimage::{get_algorithm, HashAlgorithm, IndexFile};
 
 #[derive(Parser)]
 #[command(name = "benchmark", about = "Benchmark preimage index build, sort, and lookup performance")]

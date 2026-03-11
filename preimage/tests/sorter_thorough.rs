@@ -265,7 +265,7 @@ fn test_words_sort_all_in_memory() {
         .join("test_data")
         .join("words.txt");
     let temp = NamedTempFile::new().expect("temp file");
-    let index = IndexFile::build(&preimage::hashes::Md5, &words, temp.path(), None)
+    let index = IndexFile::build(&preimage::Md5, &words, temp.path(), None)
         .expect("build");
 
     let before = fingerprint(&read_all_entries(temp.path()));

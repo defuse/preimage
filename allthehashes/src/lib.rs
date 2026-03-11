@@ -1,3 +1,8 @@
+//! Unified interface for 58 hash algorithms.
+//!
+//! This crate provides a common `HashAlgorithm` trait and implementations
+//! for cryptographic hashes, legacy hashes, and non-cryptographic checksums.
+
 mod standard;
 mod ntlm;
 mod lm;
@@ -64,7 +69,10 @@ custom_hash!(Haval256_3, "haval256,3", haval::haval256_3, 32);
 custom_hash!(Haval256_4, "haval256,4", haval::haval256_4, 32);
 custom_hash!(Haval256_5, "haval256,5", haval::haval256_5, 32);
 
-// Static algorithm references — zero heap allocation, just a pointer to a vtable.
+// =============================================================================
+// Static algorithm references
+// =============================================================================
+
 // Original algorithms
 pub static MD2: &dyn HashAlgorithm = &Md2;
 pub static MD4: &dyn HashAlgorithm = &Md4;
@@ -82,7 +90,7 @@ pub static MD5MD5: &dyn HashAlgorithm = &Md5Md5;
 pub static MYSQL41: &dyn HashAlgorithm = &MySql41;
 pub static QUBESV31: &dyn HashAlgorithm = &QubesV31;
 
-// New SHA-2 variants
+// SHA-2 variants
 pub static SHA512_224: &dyn HashAlgorithm = &Sha512_224;
 pub static SHA512_256: &dyn HashAlgorithm = &Sha512_256;
 
@@ -141,6 +149,10 @@ pub static FNV1A32: &dyn HashAlgorithm = &Fnv1a32;
 pub static FNV1A64: &dyn HashAlgorithm = &Fnv1a64;
 pub static JOAAT: &dyn HashAlgorithm = &Joaat;
 
+// =============================================================================
+// HashAlgorithm trait
+// =============================================================================
+
 /// Trait for hash algorithm implementations.
 ///
 /// Implementations must be `Send + Sync` for use in multi-table lookups.
@@ -166,3 +178,135 @@ impl<T: HashAlgorithm + ?Sized> HashAlgorithm for Box<T> {
     }
 }
 
+// =============================================================================
+// Algorithm registry
+// =============================================================================
+
+/// Look up a built-in algorithm by its CLI name (case-sensitive).
+///
+/// Returns a static reference — no heap allocation.
+pub fn get_algorithm(name: &str) -> Option<&'static dyn HashAlgorithm> {
+    match name {
+        "adler32" => Some(ADLER32),
+        "crc32" => Some(CRC32),
+        "crc32b" => Some(CRC32B),
+        "crc32c" => Some(CRC32C),
+        "fnv132" => Some(FNV132),
+        "fnv164" => Some(FNV164),
+        "fnv1a32" => Some(FNV1A32),
+        "fnv1a64" => Some(FNV1A64),
+        "gost" => Some(GOST94TEST),
+        "gost-crypto" => Some(GOST94CRYPTOPRO),
+        "haval128,3" => Some(HAVAL128_3),
+        "haval128,4" => Some(HAVAL128_4),
+        "haval128,5" => Some(HAVAL128_5),
+        "haval160,3" => Some(HAVAL160_3),
+        "haval160,4" => Some(HAVAL160_4),
+        "haval160,5" => Some(HAVAL160_5),
+        "haval192,3" => Some(HAVAL192_3),
+        "haval192,4" => Some(HAVAL192_4),
+        "haval192,5" => Some(HAVAL192_5),
+        "haval224,3" => Some(HAVAL224_3),
+        "haval224,4" => Some(HAVAL224_4),
+        "haval224,5" => Some(HAVAL224_5),
+        "haval256,3" => Some(HAVAL256_3),
+        "haval256,4" => Some(HAVAL256_4),
+        "haval256,5" => Some(HAVAL256_5),
+        "joaat" => Some(JOAAT),
+        "LM" => Some(LM),
+        "md2" => Some(MD2),
+        "md4" => Some(MD4),
+        "md5" => Some(MD5),
+        "md5(md5)" => Some(MD5MD5),
+        "MySQL4.1+" => Some(MYSQL41),
+        "NTLM" => Some(NTLM),
+        "QubesV3.1BackupDefaults" => Some(QUBESV31),
+        "ripemd128" => Some(RIPEMD128),
+        "ripemd160" => Some(RIPEMD160),
+        "ripemd256" => Some(RIPEMD256),
+        "ripemd320" => Some(RIPEMD320),
+        "sha1" => Some(SHA1),
+        "sha224" => Some(SHA224),
+        "sha256" => Some(SHA256),
+        "sha384" => Some(SHA384),
+        "sha3-224" => Some(SHA3_224),
+        "sha3-256" => Some(SHA3_256),
+        "sha3-384" => Some(SHA3_384),
+        "sha3-512" => Some(SHA3_512),
+        "sha512" => Some(SHA512),
+        "sha512/224" => Some(SHA512_224),
+        "sha512/256" => Some(SHA512_256),
+        "snefru" => Some(SNEFRU),
+        "snefru256" => Some(SNEFRU256),
+        "tiger128,3" => Some(TIGER128_3),
+        "tiger128,4" => Some(TIGER128_4),
+        "tiger160,3" => Some(TIGER160_3),
+        "tiger160,4" => Some(TIGER160_4),
+        "tiger192,3" => Some(TIGER192_3),
+        "tiger192,4" => Some(TIGER192_4),
+        "whirlpool" => Some(WHIRLPOOL),
+        _ => None,
+    }
+}
+
+/// Sorted list of all algorithm names.
+pub const ALGORITHM_NAMES: &[&str] = &[
+    "LM",
+    "MySQL4.1+",
+    "NTLM",
+    "QubesV3.1BackupDefaults",
+    "adler32",
+    "crc32",
+    "crc32b",
+    "crc32c",
+    "fnv132",
+    "fnv164",
+    "fnv1a32",
+    "fnv1a64",
+    "gost",
+    "gost-crypto",
+    "haval128,3",
+    "haval128,4",
+    "haval128,5",
+    "haval160,3",
+    "haval160,4",
+    "haval160,5",
+    "haval192,3",
+    "haval192,4",
+    "haval192,5",
+    "haval224,3",
+    "haval224,4",
+    "haval224,5",
+    "haval256,3",
+    "haval256,4",
+    "haval256,5",
+    "joaat",
+    "md2",
+    "md4",
+    "md5",
+    "md5(md5)",
+    "ripemd128",
+    "ripemd160",
+    "ripemd256",
+    "ripemd320",
+    "sha1",
+    "sha224",
+    "sha256",
+    "sha384",
+    "sha3-224",
+    "sha3-256",
+    "sha3-384",
+    "sha3-512",
+    "sha512",
+    "sha512/224",
+    "sha512/256",
+    "snefru",
+    "snefru256",
+    "tiger128,3",
+    "tiger128,4",
+    "tiger160,3",
+    "tiger160,4",
+    "tiger192,3",
+    "tiger192,4",
+    "whirlpool",
+];

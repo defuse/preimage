@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::hashes::HashAlgorithm;
+use crate::HashAlgorithm;
 use crate::index::lookup::{parse_hash_hex, LookupMatch, LookupTable};
 
 /// A match from the oracle, wrapping a LookupMatch with table context.
@@ -137,7 +137,7 @@ fn has_full_match(result: &HashResult<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::index::builder::IndexBuilder;
-    use crate::hashes::{MD5, SHA1, Md5, Sha1};
+    use crate::{MD5, SHA1, Md5, Sha1};
     use crate::index::sorter::IndexSorter;
     use tempfile::NamedTempFile;
 

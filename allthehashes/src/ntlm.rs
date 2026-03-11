@@ -1,5 +1,5 @@
 use digest::Digest;
-use super::HashAlgorithm;
+use crate::HashAlgorithm;
 
 /// NTLM hash: UTF-8 → UTF-16LE → MD4.
 ///

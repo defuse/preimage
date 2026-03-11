@@ -3,7 +3,7 @@
 //! These are fast checksums not designed for security, but included for
 //! compatibility with PHP's hash() function.
 
-use crate::hashes::HashAlgorithm;
+use crate::HashAlgorithm;
 use crc::{Crc, CRC_32_BZIP2, CRC_32_ISCSI, CRC_32_ISO_HDLC};
 
 // =============================================================================

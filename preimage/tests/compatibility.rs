@@ -1,11 +1,10 @@
 use std::path::PathBuf;
 
-use preimage::hashes::{
+use preimage::{
     Md5, Md5Md5, MySql41, Ntlm, Lm, Sha1, Sha256, Whirlpool,
     MD5, MD5MD5, MYSQL41, NTLM, LM, SHA1, SHA256, WHIRLPOOL,
-    HashAlgorithm,
+    HashAlgorithm, HashResult, IndexFile, LookupMatch,
 };
-use preimage::{HashResult, IndexFile, LookupMatch};
 use preimage::PreimageOracle;
 use tempfile::NamedTempFile;
 

@@ -1,6 +1,6 @@
 use digest::Digest;
 use hmac::{Hmac, Mac};
-use super::HashAlgorithm;
+use crate::HashAlgorithm;
 
 /// MD5(MD5): compute MD5, hex-encode, then MD5 the hex string.
 pub struct Md5Md5;
