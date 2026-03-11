@@ -29,6 +29,7 @@ pub enum HashResult<'a> {
 /// Multi-table hash lookup oracle.
 ///
 /// Register multiple `LookupTable`s and crack hashes against all of them.
+#[derive(Default)]
 pub struct PreimageOracle {
     tables: Vec<Table>,
 }
@@ -40,7 +41,7 @@ struct Table {
 
 impl PreimageOracle {
     pub fn new() -> Self {
-        Self { tables: Vec::new() }
+        Self::default()
     }
 
     /// Register a lookup table.

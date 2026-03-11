@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use anyhow::{bail, Result};
@@ -191,7 +191,7 @@ fn algorithm_from_name(name: &str) -> &'static dyn HashAlgorithm {
     })
 }
 
-fn cmd_create(algorithm_name: &str, wordlist: &PathBuf, output: &PathBuf) -> Result<()> {
+fn cmd_create(algorithm_name: &str, wordlist: &Path, output: &Path) -> Result<()> {
     let algorithm = algorithm_from_name(algorithm_name);
 
     let pb = ProgressBar::new(0);
@@ -272,8 +272,8 @@ fn cmd_lookup(args: LookupArgs) -> Result<()> {
 
 fn lookup_single(
     algorithm_name: &str,
-    index_path: &PathBuf,
-    dict_path: &PathBuf,
+    index_path: &Path,
+    dict_path: &Path,
     hashes: &[String],
 ) -> Result<()> {
     let algorithm = algorithm_from_name(algorithm_name);

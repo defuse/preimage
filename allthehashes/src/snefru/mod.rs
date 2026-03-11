@@ -141,7 +141,7 @@ fn snefru_block(state: &mut [u32; 16]) {
         let t0 = &SBOX[2 * round];
         let t1 = &SBOX[2 * round + 1];
 
-        for sub_round in 0..4 {
+        for &shift in &SHIFTS {
             // Apply S-box lookups and XOR operations
             macro_rules! sbox_round {
                 ($l:expr, $c:expr, $n:expr, $table:expr) => {{
@@ -169,7 +169,6 @@ fn snefru_block(state: &mut [u32; 16]) {
             sbox_round!(14, 15, 0, t1);
 
             // Rotate all state words
-            let shift = SHIFTS[sub_round];
             for word in &mut b {
                 *word = word.rotate_right(shift);
             }

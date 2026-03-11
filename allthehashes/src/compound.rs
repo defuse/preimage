@@ -33,7 +33,7 @@ impl HashAlgorithm for MySql41 {
         let first = hasher.finalize();
 
         let mut hasher = sha1::Sha1::new();
-        hasher.update(&first);
+        hasher.update(first);
         Some(hasher.finalize().to_vec())
     }
 

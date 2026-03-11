@@ -219,7 +219,7 @@ impl LookupTable {
 
 /// Parse a hex-encoded hash string into raw bytes.
 pub(crate) fn parse_hash_hex(hash_hex: &str) -> Result<Vec<u8>> {
-    if hash_hex.len() % 2 != 0 {
+    if !hash_hex.len().is_multiple_of(2) {
         bail!("hash hex string has odd length");
     }
     if hash_hex.len() < HASH_PREFIX_LEN * 2 {
