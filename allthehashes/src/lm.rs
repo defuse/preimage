@@ -1,6 +1,6 @@
 use des::cipher::{BlockEncrypt, KeyInit};
 use des::Des;
-use super::HashAlgorithm;
+use crate::HashAlgorithm;
 
 /// LAN Manager hash.
 ///
@@ -87,6 +87,19 @@ mod tests {
         let lower = Lm.hash(b"password").expect("should not fail");
         let upper = Lm.hash(b"PASSWORD").expect("should not fail");
         assert_eq!(lower, upper);
+    }
+
+    #[test]
+    fn test_lm_hello() {
+        let hash = Lm.hash(b"hello").expect("should not fail");
+        assert_eq!(hex::encode(&hash), "fda95fbeca288d44aad3b435b51404ee");
+    }
+
+    #[test]
+    fn test_lm_emoji() {
+        // LM treats emoji as raw bytes, uppercases byte-by-byte (no-op for high bytes)
+        let hash = Lm.hash("😀".as_bytes()).expect("should not fail");
+        assert_eq!(hex::encode(&hash), "727f6a04bfb4f99faad3b435b51404ee");
     }
 
     #[test]

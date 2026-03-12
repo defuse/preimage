@@ -1,5 +1,5 @@
 use digest::Digest;
-use super::HashAlgorithm;
+use crate::HashAlgorithm;
 
 /// NTLM hash: UTF-8 → UTF-16LE → MD4.
 ///
@@ -29,10 +29,24 @@ impl HashAlgorithm for Ntlm {
 mod tests {
     use super::*;
 
+    // Test vectors verified against PHP: hash("md4", mb_convert_encoding($s, "UTF-16LE", "UTF-8"))
+
     #[test]
     fn test_ntlm_empty() {
         let hash = Ntlm.hash(b"").expect("empty string is valid UTF-8");
         assert_eq!(hex::encode(&hash), "31d6cfe0d16ae931b73c59d7e0c089c0");
+    }
+
+    #[test]
+    fn test_ntlm_hello() {
+        let hash = Ntlm.hash(b"hello").expect("should succeed");
+        assert_eq!(hex::encode(&hash), "066ddfd4ef0e9cd7c256fe77191ef43c");
+    }
+
+    #[test]
+    fn test_ntlm_emoji() {
+        let hash = Ntlm.hash("😀".as_bytes()).expect("emoji is valid UTF-8");
+        assert_eq!(hex::encode(&hash), "4b58a10cc20a4e7d808d218e1f80aabc");
     }
 
     #[test]

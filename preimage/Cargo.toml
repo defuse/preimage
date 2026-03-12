@@ -1,0 +1,43 @@
+[package]
+name = "preimage"
+version = "0.1.0"
+edition = "2021"
+description = "Hash lookup tables for password cracking"
+license = "MIT"
+repository = "https://github.com/defuse/preimage"
+keywords = ["hash", "password", "cracking", "lookup"]
+categories = ["command-line-utilities", "cryptography"]
+authors = ["Taylor Hornby"]
+default-run = "preimage"
+
+[dependencies]
+allthehashes = { path = "../allthehashes" }
+clap = { version = "4", features = ["derive"], optional = true }
+memmap2 = "0.9"
+thiserror = "2"
+anyhow = "1"
+indicatif = "0.17"
+hex = "0.4"
+toml = { version = "0.8", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+rand = { version = "0.8", features = ["small_rng"], optional = true }
+humansize = { version = "2", optional = true }
+
+[features]
+default = ["cli"]
+cli = ["dep:clap", "dep:toml", "dep:serde"]
+bench = ["dep:rand", "dep:clap", "dep:humansize"]
+
+[[bin]]
+name = "preimage"
+path = "src/bin/preimage.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "benchmark"
+path = "src/bin/benchmark.rs"
+required-features = ["bench"]
+
+[dev-dependencies]
+tempfile = "3"
+rand = { version = "0.8", features = ["small_rng"] }

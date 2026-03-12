@@ -6,7 +6,7 @@ use anyhow::{bail, Result};
 use memmap2::Mmap;
 
 use crate::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
-use crate::hashes::HashAlgorithm;
+use crate::HashAlgorithm;
 
 /// A match from looking up one hash against one index.
 pub enum LookupMatch {
@@ -219,7 +219,7 @@ impl LookupTable {
 
 /// Parse a hex-encoded hash string into raw bytes.
 pub(crate) fn parse_hash_hex(hash_hex: &str) -> Result<Vec<u8>> {
-    if hash_hex.len() % 2 != 0 {
+    if !hash_hex.len().is_multiple_of(2) {
         bail!("hash hex string has odd length");
     }
     if hash_hex.len() < HASH_PREFIX_LEN * 2 {
@@ -257,7 +257,7 @@ fn read_word_at(file: &mut File, position: u64) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::index::builder::IndexBuilder;
-    use crate::hashes::{Md5, MD5};
+    use crate::{Md5, MD5};
     use crate::index::sorter::IndexSorter;
     use tempfile::NamedTempFile;
 

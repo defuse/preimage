@@ -1,48 +1,7 @@
-[package]
-name = "preimage"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-clap = { version = "4", features = ["derive"], optional = true }
-md2 = "0.10"
-md-5 = "0.10"
-md4 = "0.10"
-sha1 = "0.10"
-sha2 = "0.10"
-whirlpool = "0.10"
-ripemd = "0.1"
-des = "0.8"
-hmac = "0.12"
-digest = "0.10"
-memmap2 = "0.9"
-thiserror = "2"
-anyhow = "1"
-indicatif = "0.17"
-hex = "0.4"
-toml = { version = "0.8", optional = true }
-serde = { version = "1", features = ["derive"], optional = true }
-rand = { version = "0.8", features = ["small_rng"], optional = true }
-humansize = { version = "2", optional = true }
-
-[features]
-default = ["cli"]
-cli = ["dep:clap", "dep:toml", "dep:serde"]
-bench = ["dep:rand", "dep:clap", "dep:humansize"]
-
-[[bin]]
-name = "preimage"
-path = "src/bin/preimage.rs"
-required-features = ["cli"]
-
-[[bin]]
-name = "benchmark"
-path = "src/bin/benchmark.rs"
-required-features = ["bench"]
+[workspace]
+members = ["allthehashes", "preimage"]
+default-members = ["preimage"]
+resolver = "2"
 
 [profile.release]
 debug = true
-
-[dev-dependencies]
-tempfile = "3"
-rand = { version = "0.8", features = ["small_rng"] }
