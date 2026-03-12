@@ -141,4 +141,86 @@ mod tests {
     fn test_tiger192_4_emoji() {
         assert_eq!(hex::encode(tiger192_4("😀".as_bytes())), "63c65f81c685fb695b7018f91e5b38850d30cfde316252a2");
     }
+
+    // === Multi-block tests (block size = 64 bytes) ===
+    // Tests block boundary handling for Tiger-192 with both 3 and 4 passes
+
+    // Tiger-192,3 block boundaries
+    #[test]
+    fn test_tiger192_3_63_bytes() {
+        assert_eq!(hex::encode(tiger192_3(&[b'a'; 63])), "9366604ea109e48ed763caabb2d5633b4946eb295ef5781a");
+    }
+    #[test]
+    fn test_tiger192_3_64_bytes() {
+        assert_eq!(hex::encode(tiger192_3(&[b'a'; 64])), "7503f313bbea92eddca90c5d3fcc4368237457df366fb76e");
+    }
+    #[test]
+    fn test_tiger192_3_65_bytes() {
+        assert_eq!(hex::encode(tiger192_3(&[b'a'; 65])), "cbda40c307784ada92118d491e32b87bbb8ddc8b4f465682");
+    }
+    #[test]
+    fn test_tiger192_3_127_bytes() {
+        assert_eq!(hex::encode(tiger192_3(&[b'a'; 127])), "2c13e6dfaaf99a4e2647a7e41c38f773336ed6edc7881ae5");
+    }
+    #[test]
+    fn test_tiger192_3_128_bytes() {
+        assert_eq!(hex::encode(tiger192_3(&[b'a'; 128])), "8af53f73f7a1d6b779d8413bed53b9350fc56bf6138a39d8");
+    }
+    #[test]
+    fn test_tiger192_3_129_bytes() {
+        assert_eq!(hex::encode(tiger192_3(&[b'a'; 129])), "486f502a3e418a699404730b4bbace81e63c2765f4a60cc2");
+    }
+    #[test]
+    fn test_tiger192_3_1000_bytes() {
+        assert_eq!(hex::encode(tiger192_3(&[b'a'; 1000])), "42c18814a47b257c40160a80fbe604d949613ee029b31fd9");
+    }
+
+    // Tiger-192,4 block boundaries
+    #[test]
+    fn test_tiger192_4_63_bytes() {
+        assert_eq!(hex::encode(tiger192_4(&[b'a'; 63])), "fe897ca63f7389d73c025b32f4bdce503a48d310a20f7211");
+    }
+    #[test]
+    fn test_tiger192_4_64_bytes() {
+        assert_eq!(hex::encode(tiger192_4(&[b'a'; 64])), "03346632cc7d78562193f6863e20dcaa648dd42738427129");
+    }
+    #[test]
+    fn test_tiger192_4_65_bytes() {
+        assert_eq!(hex::encode(tiger192_4(&[b'a'; 65])), "507a8f807e3871bddae5229f041b30629cc5dbe3c41b2742");
+    }
+    #[test]
+    fn test_tiger192_4_127_bytes() {
+        assert_eq!(hex::encode(tiger192_4(&[b'a'; 127])), "3842fe9c17b773f6289de92659bbfc5f5daf83e8f206c3b7");
+    }
+    #[test]
+    fn test_tiger192_4_128_bytes() {
+        assert_eq!(hex::encode(tiger192_4(&[b'a'; 128])), "967901ee8c7ef31dda6061766bbe1655e65613651ac353ee");
+    }
+    #[test]
+    fn test_tiger192_4_129_bytes() {
+        assert_eq!(hex::encode(tiger192_4(&[b'a'; 129])), "de966e7a07ba524ea2ac6d97f77ee57d07386c8379daf27b");
+    }
+    #[test]
+    fn test_tiger192_4_1000_bytes() {
+        assert_eq!(hex::encode(tiger192_4(&[b'a'; 1000])), "63533e5d476a781949e58b25e67bb182d556a52241f6c3e4");
+    }
+
+    // === Binary pattern tests ===
+
+    #[test]
+    fn test_tiger192_3_64_0xff() {
+        assert_eq!(hex::encode(tiger192_3(&[0xFFu8; 64])), "19622a5aebe86f646b8e06d33a120a368bb7381a60371c8d");
+    }
+    #[test]
+    fn test_tiger192_3_128_0xff() {
+        assert_eq!(hex::encode(tiger192_3(&[0xFFu8; 128])), "53cf15e44ae146c1c4be3155664be98057159304c3354b81");
+    }
+    #[test]
+    fn test_tiger192_4_64_0xff() {
+        assert_eq!(hex::encode(tiger192_4(&[0xFFu8; 64])), "abed1a9c3e17b5b1b03488ab0c4d8ae82953828b8c504991");
+    }
+    #[test]
+    fn test_tiger192_4_128_0xff() {
+        assert_eq!(hex::encode(tiger192_4(&[0xFFu8; 128])), "cbca6a5a7873edc33b953b65158e2f73900f6435c34b051f");
+    }
 }
