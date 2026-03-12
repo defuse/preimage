@@ -2,7 +2,12 @@
 name = "allthehashes"
 version = "0.1.0"
 edition = "2021"
-description = "Unified interface for 58 hash algorithms"
+description = "Every hash function in one crate"
+license = "MIT"
+repository = "https://github.com/defuse/preimage"
+keywords = ["hash", "cryptography", "md5", "sha256", "digest"]
+categories = ["cryptography", "algorithms"]
+authors = ["Taylor Hornby"]
 
 [dependencies]
 md2 = "0.10"
