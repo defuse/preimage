@@ -596,6 +596,132 @@ mod tests {
     // Test vectors verified against PHP 8.x using:
     // php -r 'echo hash("havalXXX,Y", "...");'
 
+    // === "hello" tests for all 15 variants ===
+
+    #[test]
+    fn test_haval128_3_hello() {
+        assert_eq!(hex::encode(haval128_3(b"hello")), "85c3e4fac0ba4d85519978fdc3d1d9be");
+    }
+    #[test]
+    fn test_haval128_4_hello() {
+        assert_eq!(hex::encode(haval128_4(b"hello")), "fe10754e0b31d69d4ece9c7a46e044e5");
+    }
+    #[test]
+    fn test_haval128_5_hello() {
+        assert_eq!(hex::encode(haval128_5(b"hello")), "d20e920d5be9d9d34855accb501d1987");
+    }
+    #[test]
+    fn test_haval160_3_hello() {
+        assert_eq!(hex::encode(haval160_3(b"hello")), "0e53b29ad41cea507a343cdd8b62106864f6b3fe");
+    }
+    #[test]
+    fn test_haval160_4_hello() {
+        assert_eq!(hex::encode(haval160_4(b"hello")), "b9afd44b015f8afce44e4e02d8b908ed857afbd1");
+    }
+    #[test]
+    fn test_haval160_5_hello() {
+        assert_eq!(hex::encode(haval160_5(b"hello")), "dac5e2024bfea142e53d1422b90c9ee2c8187cc6");
+    }
+    #[test]
+    fn test_haval192_3_hello() {
+        assert_eq!(hex::encode(haval192_3(b"hello")), "bfaf81218bbb8ee51b600f5088c4b8601558ff56e2de1c4f");
+    }
+    #[test]
+    fn test_haval192_4_hello() {
+        assert_eq!(hex::encode(haval192_4(b"hello")), "ae73833a09e84691d0214f360ee5027396f12599e3618118");
+    }
+    #[test]
+    fn test_haval192_5_hello() {
+        assert_eq!(hex::encode(haval192_5(b"hello")), "bbb99b1e989ec3174019b20792fd92dd67175c2ff6ce5965");
+    }
+    #[test]
+    fn test_haval224_3_hello() {
+        assert_eq!(hex::encode(haval224_3(b"hello")), "92d0e3354be5d525616f217660e0f860b5d472a9cb99d6766be90b15");
+    }
+    #[test]
+    fn test_haval224_4_hello() {
+        assert_eq!(hex::encode(haval224_4(b"hello")), "e1ad67dc7a5901496b15dab92c2715de4b120af2baf661ecd9266317");
+    }
+    #[test]
+    fn test_haval224_5_hello() {
+        assert_eq!(hex::encode(haval224_5(b"hello")), "aa6551d75e33a9c5cd4141e9a068b1fc7b6d847f85c3ab1629578ed3");
+    }
+    #[test]
+    fn test_haval256_3_hello() {
+        assert_eq!(hex::encode(haval256_3(b"hello")), "26718e4fb05595cb8703a672a8ae91eea071cac5e7426173d4c25a611c4b8022");
+    }
+    #[test]
+    fn test_haval256_4_hello() {
+        assert_eq!(hex::encode(haval256_4(b"hello")), "2d39577df3a6a63168826b2a10f07a65a676f5776a0772e0a877e27ec3c4c0ad");
+    }
+    #[test]
+    fn test_haval256_5_hello() {
+        assert_eq!(hex::encode(haval256_5(b"hello")), "348298791817d5088a6de6c1b6364756d404a50bd64e645035f8cd4291c482c7");
+    }
+
+    // === Emoji (😀) tests for all 15 variants ===
+
+    #[test]
+    fn test_haval128_3_emoji() {
+        assert_eq!(hex::encode(haval128_3("😀".as_bytes())), "730c55c19a5e76e0759a8d48230d1a0d");
+    }
+    #[test]
+    fn test_haval128_4_emoji() {
+        assert_eq!(hex::encode(haval128_4("😀".as_bytes())), "4d513ff4f2cc8688d27d32dda9b6c3c9");
+    }
+    #[test]
+    fn test_haval128_5_emoji() {
+        assert_eq!(hex::encode(haval128_5("😀".as_bytes())), "36772b4e5c06cfa5bd02701103276ac6");
+    }
+    #[test]
+    fn test_haval160_3_emoji() {
+        assert_eq!(hex::encode(haval160_3("😀".as_bytes())), "e1d0813b699cde4794ea9394c6a1ce1812ba2ef2");
+    }
+    #[test]
+    fn test_haval160_4_emoji() {
+        assert_eq!(hex::encode(haval160_4("😀".as_bytes())), "d01c8ddaa3d4bb6f7b0f70d6b6707cead73d5938");
+    }
+    #[test]
+    fn test_haval160_5_emoji() {
+        assert_eq!(hex::encode(haval160_5("😀".as_bytes())), "f875cbfc6b064356cff76e17cec063dc7ed8f06f");
+    }
+    #[test]
+    fn test_haval192_3_emoji() {
+        assert_eq!(hex::encode(haval192_3("😀".as_bytes())), "3ba432c236bcd3924ce3e9faa9f8a7a803396f32d74df044");
+    }
+    #[test]
+    fn test_haval192_4_emoji() {
+        assert_eq!(hex::encode(haval192_4("😀".as_bytes())), "bdd69520bc1be0bf59919bb363fbfa1b98188ee9fc399e60");
+    }
+    #[test]
+    fn test_haval192_5_emoji() {
+        assert_eq!(hex::encode(haval192_5("😀".as_bytes())), "6d9791cb02f0baaca3276745fc3b21e5fdb4b0c4b6dce8eb");
+    }
+    #[test]
+    fn test_haval224_3_emoji() {
+        assert_eq!(hex::encode(haval224_3("😀".as_bytes())), "57d3fcc74cfe01598c32804c63298edebe1687e4d0764502f40a78e7");
+    }
+    #[test]
+    fn test_haval224_4_emoji() {
+        assert_eq!(hex::encode(haval224_4("😀".as_bytes())), "942dba6403beeff992928b5286ab21e8ed923ef74fb3230540fe2ad2");
+    }
+    #[test]
+    fn test_haval224_5_emoji() {
+        assert_eq!(hex::encode(haval224_5("😀".as_bytes())), "c0b4ea1254e99f885fc116fbfe27df900ba34b7f7222c44e0aa0ec9f");
+    }
+    #[test]
+    fn test_haval256_3_emoji() {
+        assert_eq!(hex::encode(haval256_3("😀".as_bytes())), "8b9e8c223e3970cf98895a5af35d6e11ee466131d1ebfe07d5982e5acd841c5b");
+    }
+    #[test]
+    fn test_haval256_4_emoji() {
+        assert_eq!(hex::encode(haval256_4("😀".as_bytes())), "bf23332ae5136857e99dee0e145bfad12637eab08bb6ec7611d4ee764391b4ba");
+    }
+    #[test]
+    fn test_haval256_5_emoji() {
+        assert_eq!(hex::encode(haval256_5("😀".as_bytes())), "8e3f708432178aee9e3efef0314703bd951c8e2d4a712acb68fe56f5dee0753d");
+    }
+
     // === HAVAL-128 tests ===
     #[test]
     fn test_haval128_3_empty() {

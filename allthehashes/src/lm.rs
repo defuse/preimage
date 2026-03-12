@@ -90,6 +90,19 @@ mod tests {
     }
 
     #[test]
+    fn test_lm_hello() {
+        let hash = Lm.hash(b"hello").expect("should not fail");
+        assert_eq!(hex::encode(&hash), "fda95fbeca288d44aad3b435b51404ee");
+    }
+
+    #[test]
+    fn test_lm_emoji() {
+        // LM treats emoji as raw bytes, uppercases byte-by-byte (no-op for high bytes)
+        let hash = Lm.hash("😀".as_bytes()).expect("should not fail");
+        assert_eq!(hex::encode(&hash), "727f6a04bfb4f99faad3b435b51404ee");
+    }
+
+    #[test]
     fn test_lm_truncation() {
         // LM only uses first 14 characters
         let short = Lm.hash(b"12345678901234").expect("should not fail");

@@ -67,30 +67,63 @@ impl HashAlgorithm for QubesV31 {
 mod tests {
     use super::*;
 
+    // Test vectors verified against PHP: md5(md5($s))
+
+    #[test]
+    fn test_md5md5_empty() {
+        let hash = Md5Md5.hash(b"").expect("should not fail");
+        assert_eq!(hex::encode(&hash), "74be16979710d4c4e7c6647856088456");
+    }
+
+    #[test]
+    fn test_md5md5_hello() {
+        let hash = Md5Md5.hash(b"hello").expect("should not fail");
+        assert_eq!(hex::encode(&hash), "69a329523ce1ec88bf63061863d9cb14");
+    }
+
+    #[test]
+    fn test_md5md5_emoji() {
+        let hash = Md5Md5.hash("😀".as_bytes()).expect("should not fail");
+        assert_eq!(hex::encode(&hash), "2fc864a682f0eb486908aaeacba17611");
+    }
+
     #[test]
     fn test_md5md5_password() {
-        // MD5("password") = "5f4dcc3b5aa765d61d8327deb882cf99"
-        // MD5("5f4dcc3b5aa765d61d8327deb882cf99") = "696d29e0940a4957748fe3fc9efd22a3"
         let hash = Md5Md5.hash(b"password").expect("should not fail");
         assert_eq!(hex::encode(&hash), "696d29e0940a4957748fe3fc9efd22a3");
     }
 
+    // Test vectors verified against PHP: sha1(sha1($s, true))
+
     #[test]
-    fn test_mysql41_password() {
-        // SHA1("password") = 5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8
-        // SHA1(binary of above) = ...
-        let hash = MySql41.hash(b"password").expect("should not fail");
-        assert_eq!(hash.len(), 20);
-        // Verify against known MySQL PASSWORD() output (without the leading *)
-        assert_eq!(
-            hex::encode(&hash),
-            "2470c0c06dee42fd1618bb99005adca2ec9d1e19"
-        );
+    fn test_mysql41_empty() {
+        let hash = MySql41.hash(b"").expect("should not fail");
+        assert_eq!(hex::encode(&hash), "be1bdec0aa74b4dcb079943e70528096cca985f8");
     }
 
     #[test]
+    fn test_mysql41_hello() {
+        let hash = MySql41.hash(b"hello").expect("should not fail");
+        assert_eq!(hex::encode(&hash), "6b4f89a54e2d27ecd7e8da05b4ab8fd9d1d8b119");
+    }
+
+    #[test]
+    fn test_mysql41_emoji() {
+        let hash = MySql41.hash("😀".as_bytes()).expect("should not fail");
+        assert_eq!(hex::encode(&hash), "b55edf8cd9ee23bfc3684ca55dcfb5774d18bb51");
+    }
+
+    #[test]
+    fn test_mysql41_password() {
+        let hash = MySql41.hash(b"password").expect("should not fail");
+        // MySQL PASSWORD() output (without the leading *)
+        assert_eq!(hex::encode(&hash), "2470c0c06dee42fd1618bb99005adca2ec9d1e19");
+    }
+
+    // QubesV31 - HMAC-SHA512 with specific backup header (no external reference)
+
+    #[test]
     fn test_qubesv31_produces_64_bytes() {
-        // HMAC-SHA512 produces 64 bytes
         let hash = QubesV31.hash(b"password").expect("should not fail");
         assert_eq!(hash.len(), 64);
     }

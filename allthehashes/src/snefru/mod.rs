@@ -197,30 +197,20 @@ pub fn snefru256(data: &[u8]) -> [u8; DIGEST_SIZE] {
 mod tests {
     use super::*;
 
+    // Test vectors verified against PHP's hash() function (defuse.ca/checksums.htm)
+
     #[test]
     fn test_snefru_empty() {
-        let hash = snefru256(b"");
-        assert_eq!(
-            hex::encode(hash),
-            "8617f366566a011837f4fb4ba5bedea2b892f3ed8b894023d16ae344b2be5881"
-        );
+        assert_eq!(hex::encode(snefru256(b"")), "8617f366566a011837f4fb4ba5bedea2b892f3ed8b894023d16ae344b2be5881");
     }
 
     #[test]
-    fn test_snefru_test() {
-        let hash = snefru256(b"test");
-        assert_eq!(
-            hex::encode(hash),
-            "8d25dd0b5715f7e4c799ade3a34b5f6148d0ce416992b5c2eaf614d35d5b3d30"
-        );
+    fn test_snefru_hello() {
+        assert_eq!(hex::encode(snefru256(b"hello")), "7c5f22b1a92d9470efea37ec6ed00b2357a4ce3c41aa6e28e3b84057465dbb56");
     }
 
     #[test]
-    fn test_snefru_quick_brown_fox() {
-        let hash = snefru256(b"The quick brown fox jumps over the lazy dog");
-        assert_eq!(
-            hex::encode(hash),
-            "674caa75f9d8fd2089856b95e93a4fb42fa6c8702f8980e11d97a142d76cb358"
-        );
+    fn test_snefru_emoji() {
+        assert_eq!(hex::encode(snefru256("😀".as_bytes())), "85a8a094db2c550e8c3bc0aca6066b93108f9b702052e3e2c08abec4557b363e");
     }
 }

@@ -56,38 +56,89 @@ pub fn tiger128_4(data: &[u8]) -> [u8; 16] {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_tiger192_3_empty() {
-        let result = tiger192_3(b"");
-        let expected = hex::decode("3293ac630c13f0245f92bbb1766e16167a4e58492dde73f3").unwrap();
-        assert_eq!(&result[..], &expected[..]);
-    }
+    // Test vectors verified against PHP's hash() function (defuse.ca/checksums.htm)
 
-    #[test]
-    fn test_tiger192_3_test() {
-        let result = tiger192_3(b"test");
-        let expected = hex::decode("7ab383fc29d81f8d0d68e87c69bae5f1f18266d730c48b1d").unwrap();
-        assert_eq!(&result[..], &expected[..]);
-    }
-
-    #[test]
-    fn test_tiger192_4_empty() {
-        let result = tiger192_4(b"");
-        let expected = hex::decode("24cc78a7f6ff3546e7984e59695ca13d804e0b686e255194").unwrap();
-        assert_eq!(&result[..], &expected[..]);
-    }
-
+    // Tiger-128,3
     #[test]
     fn test_tiger128_3_empty() {
-        let result = tiger128_3(b"");
-        let expected = hex::decode("3293ac630c13f0245f92bbb1766e1616").unwrap();
-        assert_eq!(&result[..], &expected[..]);
+        assert_eq!(hex::encode(tiger128_3(b"")), "3293ac630c13f0245f92bbb1766e1616");
+    }
+    #[test]
+    fn test_tiger128_3_hello() {
+        assert_eq!(hex::encode(tiger128_3(b"hello")), "2cfd7f6f336288a7f2741b9bf874388a");
+    }
+    #[test]
+    fn test_tiger128_3_emoji() {
+        assert_eq!(hex::encode(tiger128_3("😀".as_bytes())), "baec5c095befb1f734b6f730798817b5");
     }
 
+    // Tiger-128,4
+    #[test]
+    fn test_tiger128_4_empty() {
+        assert_eq!(hex::encode(tiger128_4(b"")), "24cc78a7f6ff3546e7984e59695ca13d");
+    }
+    #[test]
+    fn test_tiger128_4_hello() {
+        assert_eq!(hex::encode(tiger128_4(b"hello")), "e8e50e239f932a1c357194e5ead0f528");
+    }
+    #[test]
+    fn test_tiger128_4_emoji() {
+        assert_eq!(hex::encode(tiger128_4("😀".as_bytes())), "63c65f81c685fb695b7018f91e5b3885");
+    }
+
+    // Tiger-160,3
     #[test]
     fn test_tiger160_3_empty() {
-        let result = tiger160_3(b"");
-        let expected = hex::decode("3293ac630c13f0245f92bbb1766e16167a4e5849").unwrap();
-        assert_eq!(&result[..], &expected[..]);
+        assert_eq!(hex::encode(tiger160_3(b"")), "3293ac630c13f0245f92bbb1766e16167a4e5849");
+    }
+    #[test]
+    fn test_tiger160_3_hello() {
+        assert_eq!(hex::encode(tiger160_3(b"hello")), "2cfd7f6f336288a7f2741b9bf874388a54026639");
+    }
+    #[test]
+    fn test_tiger160_3_emoji() {
+        assert_eq!(hex::encode(tiger160_3("😀".as_bytes())), "baec5c095befb1f734b6f730798817b5a8724214");
+    }
+
+    // Tiger-160,4
+    #[test]
+    fn test_tiger160_4_empty() {
+        assert_eq!(hex::encode(tiger160_4(b"")), "24cc78a7f6ff3546e7984e59695ca13d804e0b68");
+    }
+    #[test]
+    fn test_tiger160_4_hello() {
+        assert_eq!(hex::encode(tiger160_4(b"hello")), "e8e50e239f932a1c357194e5ead0f528dc2aebfe");
+    }
+    #[test]
+    fn test_tiger160_4_emoji() {
+        assert_eq!(hex::encode(tiger160_4("😀".as_bytes())), "63c65f81c685fb695b7018f91e5b38850d30cfde");
+    }
+
+    // Tiger-192,3
+    #[test]
+    fn test_tiger192_3_empty() {
+        assert_eq!(hex::encode(tiger192_3(b"")), "3293ac630c13f0245f92bbb1766e16167a4e58492dde73f3");
+    }
+    #[test]
+    fn test_tiger192_3_hello() {
+        assert_eq!(hex::encode(tiger192_3(b"hello")), "2cfd7f6f336288a7f2741b9bf874388a54026639cadb7bf2");
+    }
+    #[test]
+    fn test_tiger192_3_emoji() {
+        assert_eq!(hex::encode(tiger192_3("😀".as_bytes())), "baec5c095befb1f734b6f730798817b5a87242145188a49e");
+    }
+
+    // Tiger-192,4
+    #[test]
+    fn test_tiger192_4_empty() {
+        assert_eq!(hex::encode(tiger192_4(b"")), "24cc78a7f6ff3546e7984e59695ca13d804e0b686e255194");
+    }
+    #[test]
+    fn test_tiger192_4_hello() {
+        assert_eq!(hex::encode(tiger192_4(b"hello")), "e8e50e239f932a1c357194e5ead0f528dc2aebfeaed01c74");
+    }
+    #[test]
+    fn test_tiger192_4_emoji() {
+        assert_eq!(hex::encode(tiger192_4("😀".as_bytes())), "63c65f81c685fb695b7018f91e5b38850d30cfde316252a2");
     }
 }

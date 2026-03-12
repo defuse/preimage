@@ -182,63 +182,131 @@ impl HashAlgorithm for Joaat {
 mod tests {
     use super::*;
 
+    // Test vectors verified against PHP's hash() function (defuse.ca/checksums.htm)
+
+    // Adler-32
     #[test]
     fn test_adler32_empty() {
-        let hash = Adler32.hash(b"").unwrap();
-        assert_eq!(hex::encode(&hash), "00000001");
+        assert_eq!(hex::encode(Adler32.hash(b"").unwrap()), "00000001");
     }
-
     #[test]
     fn test_adler32_hello() {
-        let hash = Adler32.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "062c0215");
+        assert_eq!(hex::encode(Adler32.hash(b"hello").unwrap()), "062c0215");
+    }
+    #[test]
+    fn test_adler32_emoji() {
+        assert_eq!(hex::encode(Adler32.hash("😀".as_bytes()).unwrap()), "075102a8");
     }
 
+    // CRC-32
+    #[test]
+    fn test_crc32_empty() {
+        assert_eq!(hex::encode(Crc32.hash(b"").unwrap()), "00000000");
+    }
     #[test]
     fn test_crc32_hello() {
-        let hash = Crc32.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "3d653119");
+        assert_eq!(hex::encode(Crc32.hash(b"hello").unwrap()), "3d653119");
+    }
+    #[test]
+    fn test_crc32_emoji() {
+        assert_eq!(hex::encode(Crc32.hash("😀".as_bytes()).unwrap()), "f4ac78d9");
     }
 
+    // CRC-32B
+    #[test]
+    fn test_crc32b_empty() {
+        assert_eq!(hex::encode(Crc32b.hash(b"").unwrap()), "00000000");
+    }
     #[test]
     fn test_crc32b_hello() {
-        let hash = Crc32b.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "3610a686");
+        assert_eq!(hex::encode(Crc32b.hash(b"hello").unwrap()), "3610a686");
+    }
+    #[test]
+    fn test_crc32b_emoji() {
+        assert_eq!(hex::encode(Crc32b.hash("😀".as_bytes()).unwrap()), "054db544");
     }
 
+    // CRC-32C
+    #[test]
+    fn test_crc32c_empty() {
+        assert_eq!(hex::encode(Crc32c.hash(b"").unwrap()), "00000000");
+    }
     #[test]
     fn test_crc32c_hello() {
-        let hash = Crc32c.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "9a71bb4c");
+        assert_eq!(hex::encode(Crc32c.hash(b"hello").unwrap()), "9a71bb4c");
+    }
+    #[test]
+    fn test_crc32c_emoji() {
+        assert_eq!(hex::encode(Crc32c.hash("😀".as_bytes()).unwrap()), "e3e0db74");
     }
 
+    // FNV-1 32-bit
+    #[test]
+    fn test_fnv132_empty() {
+        assert_eq!(hex::encode(Fnv132.hash(b"").unwrap()), "811c9dc5");
+    }
     #[test]
     fn test_fnv132_hello() {
-        let hash = Fnv132.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "b6fa7167");
+        assert_eq!(hex::encode(Fnv132.hash(b"hello").unwrap()), "b6fa7167");
+    }
+    #[test]
+    fn test_fnv132_emoji() {
+        assert_eq!(hex::encode(Fnv132.hash("😀".as_bytes()).unwrap()), "fe02dc3a");
     }
 
+    // FNV-1 64-bit
+    #[test]
+    fn test_fnv164_empty() {
+        assert_eq!(hex::encode(Fnv164.hash(b"").unwrap()), "cbf29ce484222325");
+    }
     #[test]
     fn test_fnv164_hello() {
-        let hash = Fnv164.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "7b495389bdbdd4c7");
+        assert_eq!(hex::encode(Fnv164.hash(b"hello").unwrap()), "7b495389bdbdd4c7");
+    }
+    #[test]
+    fn test_fnv164_emoji() {
+        assert_eq!(hex::encode(Fnv164.hash("😀".as_bytes()).unwrap()), "5692bc7c3c90765a");
     }
 
+    // FNV-1a 32-bit
+    #[test]
+    fn test_fnv1a32_empty() {
+        assert_eq!(hex::encode(Fnv1a32.hash(b"").unwrap()), "811c9dc5");
+    }
     #[test]
     fn test_fnv1a32_hello() {
-        let hash = Fnv1a32.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "4f9f2cab");
+        assert_eq!(hex::encode(Fnv1a32.hash(b"hello").unwrap()), "4f9f2cab");
+    }
+    #[test]
+    fn test_fnv1a32_emoji() {
+        assert_eq!(hex::encode(Fnv1a32.hash("😀".as_bytes()).unwrap()), "33a29608");
     }
 
+    // FNV-1a 64-bit
+    #[test]
+    fn test_fnv1a64_empty() {
+        assert_eq!(hex::encode(Fnv1a64.hash(b"").unwrap()), "cbf29ce484222325");
+    }
     #[test]
     fn test_fnv1a64_hello() {
-        let hash = Fnv1a64.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "a430d84680aabd0b");
+        assert_eq!(hex::encode(Fnv1a64.hash(b"hello").unwrap()), "a430d84680aabd0b");
+    }
+    #[test]
+    fn test_fnv1a64_emoji() {
+        assert_eq!(hex::encode(Fnv1a64.hash("😀".as_bytes()).unwrap()), "feff073875020288");
     }
 
+    // Jenkins One-at-a-time
+    #[test]
+    fn test_joaat_empty() {
+        assert_eq!(hex::encode(Joaat.hash(b"").unwrap()), "00000000");
+    }
     #[test]
     fn test_joaat_hello() {
-        let hash = Joaat.hash(b"hello").unwrap();
-        assert_eq!(hex::encode(&hash), "c8fd181b");
+        assert_eq!(hex::encode(Joaat.hash(b"hello").unwrap()), "c8fd181b");
+    }
+    #[test]
+    fn test_joaat_emoji() {
+        assert_eq!(hex::encode(Joaat.hash("😀".as_bytes()).unwrap()), "243a5bca");
     }
 }
