@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use indicatif::ProgressBar;
 
-use crate::entry::IndexEntry;
+use super::entry::IndexEntry;
 use crate::HashAlgorithm;
 
 impl super::IndexFile {
@@ -20,7 +20,9 @@ impl super::IndexFile {
         progress: Option<&ProgressBar>,
     ) -> Result<Self> {
         IndexBuilder::build(algorithm, wordlist_path, output_path, progress)?;
-        Ok(super::IndexFile { path: output_path.to_path_buf() })
+        Ok(super::IndexFile {
+            path: output_path.to_path_buf(),
+        })
     }
 }
 
@@ -144,13 +146,14 @@ mod tests {
         write!(wordlist, "apple\nbanana\n").expect("write");
 
         let output = NamedTempFile::new().expect("temp file");
-        let count = IndexBuilder::build(&Md5, wordlist.path(), output.path(), None)
-            .expect("build failed");
+        let count =
+            IndexBuilder::build(&Md5, wordlist.path(), output.path(), None).expect("build failed");
         assert_eq!(count, 2);
 
         let data = std::fs::read(output.path()).expect("read");
         let entry0 = IndexEntry::read_from(&mut &data[0..ENTRY_SIZE]).expect("read entry");
-        let entry1 = IndexEntry::read_from(&mut &data[ENTRY_SIZE..2 * ENTRY_SIZE]).expect("read entry");
+        let entry1 =
+            IndexEntry::read_from(&mut &data[ENTRY_SIZE..2 * ENTRY_SIZE]).expect("read entry");
 
         assert_eq!(entry0.position(), 0, "apple should be at position 0");
         assert_eq!(entry1.position(), 6, "banana should be at position 6");

@@ -1,11 +1,10 @@
 use std::path::PathBuf;
 
-use preimage::{
-    Md5, Md5Md5, MySql41, Ntlm, Lm, Sha1, Sha256, Whirlpool,
-    MD5, MD5MD5, MYSQL41, NTLM, LM, SHA1, SHA256, WHIRLPOOL,
-    HashAlgorithm, HashResult, IndexFile, LookupMatch,
-};
 use preimage::PreimageOracle;
+use preimage::{
+    HashAlgorithm, HashResult, IndexFile, Lm, LookupMatch, Md5, Md5Md5, MySql41, Ntlm, Sha1,
+    Sha256, Whirlpool, LM, MD5, MD5MD5, MYSQL41, NTLM, SHA1, SHA256, WHIRLPOOL,
+};
 use tempfile::NamedTempFile;
 
 fn test_data_path() -> PathBuf {
@@ -22,8 +21,7 @@ fn build_sort_verify(algorithm: &dyn HashAlgorithm) -> NamedTempFile {
     let words = test_words_path();
     let temp = NamedTempFile::new().expect("temp file");
 
-    let index = IndexFile::build(algorithm, &words, temp.path(), None)
-        .expect("build failed");
+    let index = IndexFile::build(algorithm, &words, temp.path(), None).expect("build failed");
     assert!(
         index.entry_count().expect("entry count") > 0,
         "should create at least one entry for {}",
@@ -56,7 +54,10 @@ fn assert_contains_word(plaintexts: &[&[u8]], word: &[u8], context: &str) {
         plaintexts.contains(&word),
         "{context}: expected to find {:?}, got: {:?}",
         String::from_utf8_lossy(word),
-        plaintexts.iter().map(|p| String::from_utf8_lossy(p)).collect::<Vec<_>>()
+        plaintexts
+            .iter()
+            .map(|p| String::from_utf8_lossy(p))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -72,36 +73,50 @@ fn assert_contains_word(plaintexts: &[&[u8]], word: &[u8], context: &str) {
 fn test_crack_against_php_md5_index() {
     let ref_idx = test_data_path().join("md5_sorted_reference.idx");
     let words = test_words_path();
-    let table = IndexFile::open(&ref_idx).into_lookup_table(MD5, &words).expect("open PHP md5 index");
+    let table = IndexFile::open(&ref_idx)
+        .into_lookup_table(MD5, &words)
+        .expect("open PHP md5 index");
 
     // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
-    let matches = table.lookup("1f3870be274f6c49b3e31a0c6728957f").expect("lookup");
+    let matches = table
+        .lookup("1f3870be274f6c49b3e31a0c6728957f")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"apple", "PHP md5 index");
 
     // MD5("banana") = 72b302bf297a228a75730123efef7c41
-    let matches = table.lookup("72b302bf297a228a75730123efef7c41").expect("lookup");
+    let matches = table
+        .lookup("72b302bf297a228a75730123efef7c41")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"banana", "PHP md5 index");
 
     // MD5("orange") = fe01d67a002dfa0f3ac084298142eccd
-    let matches = table.lookup("fe01d67a002dfa0f3ac084298142eccd").expect("lookup");
+    let matches = table
+        .lookup("fe01d67a002dfa0f3ac084298142eccd")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"orange", "PHP md5 index");
 
     // MD5("fruit") = e0deff349b2c61f5f796ccaa344a4930
-    let matches = table.lookup("e0deff349b2c61f5f796ccaa344a4930").expect("lookup");
+    let matches = table
+        .lookup("e0deff349b2c61f5f796ccaa344a4930")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"fruit", "PHP md5 index");
 
     // MD5("grape") = b781cbb29054db12f88f08c6e161c199
-    let matches = table.lookup("b781cbb29054db12f88f08c6e161c199").expect("lookup");
+    let matches = table
+        .lookup("b781cbb29054db12f88f08c6e161c199")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"grape", "PHP md5 index");
 
     // MD5("ZzZz") = 0ad6b8c945189cf69fbb9850c4f8aa37
     // Large collision block — 216 identical entries
-    let matches = table.lookup("0ad6b8c945189cf69fbb9850c4f8aa37").expect("lookup");
+    let matches = table
+        .lookup("0ad6b8c945189cf69fbb9850c4f8aa37")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert!(
         plaintexts.len() >= 200,
@@ -114,7 +129,9 @@ fn test_crack_against_php_md5_index() {
     );
 
     // Not in wordlist
-    let matches = table.lookup("ffffffffffffffffffffffffffffffff").expect("lookup");
+    let matches = table
+        .lookup("ffffffffffffffffffffffffffffffff")
+        .expect("lookup");
     assert!(matches.is_empty(), "bogus hash should not match");
 }
 
@@ -122,20 +139,28 @@ fn test_crack_against_php_md5_index() {
 fn test_crack_against_php_sha1_index() {
     let ref_idx = test_data_path().join("sha1_sorted_reference.idx");
     let words = test_words_path();
-    let table = IndexFile::open(&ref_idx).into_lookup_table(SHA1, &words).expect("open PHP sha1 index");
+    let table = IndexFile::open(&ref_idx)
+        .into_lookup_table(SHA1, &words)
+        .expect("open PHP sha1 index");
 
     // SHA1("apple") = d0be2dc421be4fcd0172e5afceea3970e2f3d940
-    let matches = table.lookup("d0be2dc421be4fcd0172e5afceea3970e2f3d940").expect("lookup");
+    let matches = table
+        .lookup("d0be2dc421be4fcd0172e5afceea3970e2f3d940")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"apple", "PHP sha1 index");
 
     // SHA1("banana") = 250e77f12a5ab6972a0895d290c4792f0a326ea8
-    let matches = table.lookup("250e77f12a5ab6972a0895d290c4792f0a326ea8").expect("lookup");
+    let matches = table
+        .lookup("250e77f12a5ab6972a0895d290c4792f0a326ea8")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"banana", "PHP sha1 index");
 
     // SHA1("orange") = ef0ebbb77298e1fbd81f756a4efc35b977c93dae
-    let matches = table.lookup("ef0ebbb77298e1fbd81f756a4efc35b977c93dae").expect("lookup");
+    let matches = table
+        .lookup("ef0ebbb77298e1fbd81f756a4efc35b977c93dae")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"orange", "PHP sha1 index");
 
@@ -150,20 +175,28 @@ fn test_crack_against_php_sha1_index() {
 fn test_crack_against_php_ntlm_index() {
     let ref_idx = test_data_path().join("ntlm_sorted_reference.idx");
     let words = test_words_path();
-    let table = IndexFile::open(&ref_idx).into_lookup_table(NTLM, &words).expect("open PHP NTLM index");
+    let table = IndexFile::open(&ref_idx)
+        .into_lookup_table(NTLM, &words)
+        .expect("open PHP NTLM index");
 
     // NTLM("apple") = 5ebe7dfa074da8ee8aef1faa2bbde876
-    let matches = table.lookup("5ebe7dfa074da8ee8aef1faa2bbde876").expect("lookup");
+    let matches = table
+        .lookup("5ebe7dfa074da8ee8aef1faa2bbde876")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"apple", "PHP NTLM index");
 
     // NTLM("banana") = af5432a79b941528fa7fac9e7e391651
-    let matches = table.lookup("af5432a79b941528fa7fac9e7e391651").expect("lookup");
+    let matches = table
+        .lookup("af5432a79b941528fa7fac9e7e391651")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"banana", "PHP NTLM index");
 
     // NTLM("ZzZz") = 5cf4a2416fbd803b86291fb31a3deb1d — collision block
-    let matches = table.lookup("5cf4a2416fbd803b86291fb31a3deb1d").expect("lookup");
+    let matches = table
+        .lookup("5cf4a2416fbd803b86291fb31a3deb1d")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert!(
         plaintexts.len() >= 200,
@@ -174,7 +207,11 @@ fn test_crack_against_php_ntlm_index() {
 
 #[test]
 fn test_rust_checker_validates_php_sorted_index() {
-    for name in ["md5_sorted_reference.idx", "sha1_sorted_reference.idx", "ntlm_sorted_reference.idx"] {
+    for name in [
+        "md5_sorted_reference.idx",
+        "sha1_sorted_reference.idx",
+        "ntlm_sorted_reference.idx",
+    ] {
         let path = test_data_path().join(name);
         let index = IndexFile::open(&path);
         assert!(
@@ -192,9 +229,13 @@ fn test_rust_checker_validates_php_sorted_index() {
 fn test_md5_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&Md5);
-    let table = IndexFile::open(temp.path()).into_lookup_table(MD5, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(MD5, &words)
+        .expect("open");
 
-    let matches = table.lookup("1f3870be274f6c49b3e31a0c6728957f").expect("lookup");
+    let matches = table
+        .lookup("1f3870be274f6c49b3e31a0c6728957f")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_eq!(plaintexts, vec![b"apple".as_slice()]);
 }
@@ -203,9 +244,13 @@ fn test_md5_end_to_end() {
 fn test_sha1_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&Sha1);
-    let table = IndexFile::open(temp.path()).into_lookup_table(SHA1, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(SHA1, &words)
+        .expect("open");
 
-    let matches = table.lookup("d0be2dc421be4fcd0172e5afceea3970e2f3d940").expect("lookup");
+    let matches = table
+        .lookup("d0be2dc421be4fcd0172e5afceea3970e2f3d940")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_eq!(plaintexts, vec![b"apple".as_slice()]);
 }
@@ -214,9 +259,13 @@ fn test_sha1_end_to_end() {
 fn test_sha256_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&Sha256);
-    let table = IndexFile::open(temp.path()).into_lookup_table(SHA256, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(SHA256, &words)
+        .expect("open");
 
-    let matches = table.lookup("3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b").expect("lookup");
+    let matches = table
+        .lookup("3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_eq!(plaintexts, vec![b"apple".as_slice()]);
 }
@@ -225,9 +274,13 @@ fn test_sha256_end_to_end() {
 fn test_ntlm_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&Ntlm);
-    let table = IndexFile::open(temp.path()).into_lookup_table(NTLM, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(NTLM, &words)
+        .expect("open");
 
-    let matches = table.lookup("5ebe7dfa074da8ee8aef1faa2bbde876").expect("lookup");
+    let matches = table
+        .lookup("5ebe7dfa074da8ee8aef1faa2bbde876")
+        .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
     assert_contains_word(&plaintexts, b"apple", "Rust NTLM");
 }
@@ -236,7 +289,9 @@ fn test_ntlm_end_to_end() {
 fn test_lm_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&Lm);
-    let table = IndexFile::open(temp.path()).into_lookup_table(LM, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(LM, &words)
+        .expect("open");
 
     let expected_hash = hex::encode(Lm.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
@@ -248,36 +303,51 @@ fn test_lm_end_to_end() {
 fn test_md5md5_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&Md5Md5);
-    let table = IndexFile::open(temp.path()).into_lookup_table(MD5MD5, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(MD5MD5, &words)
+        .expect("open");
 
     let expected_hash = hex::encode(Md5Md5.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
-    assert!(!plaintexts.is_empty(), "should find 'apple' via md5(md5) lookup");
+    assert!(
+        !plaintexts.is_empty(),
+        "should find 'apple' via md5(md5) lookup"
+    );
 }
 
 #[test]
 fn test_mysql41_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&MySql41);
-    let table = IndexFile::open(temp.path()).into_lookup_table(MYSQL41, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(MYSQL41, &words)
+        .expect("open");
 
     let expected_hash = hex::encode(MySql41.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
-    assert!(!plaintexts.is_empty(), "should find 'apple' via MySQL4.1+ lookup");
+    assert!(
+        !plaintexts.is_empty(),
+        "should find 'apple' via MySQL4.1+ lookup"
+    );
 }
 
 #[test]
 fn test_whirlpool_end_to_end() {
     let words = test_words_path();
     let temp = build_sort_verify(&Whirlpool);
-    let table = IndexFile::open(temp.path()).into_lookup_table(WHIRLPOOL, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(WHIRLPOOL, &words)
+        .expect("open");
 
     let expected_hash = hex::encode(Whirlpool.hash(b"apple").expect("hash"));
     let matches = table.lookup(&expected_hash).expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
-    assert!(!plaintexts.is_empty(), "should find 'apple' via whirlpool lookup");
+    assert!(
+        !plaintexts.is_empty(),
+        "should find 'apple' via whirlpool lookup"
+    );
 }
 
 // ============================================================
@@ -291,8 +361,12 @@ fn test_oracle_multi_algorithm() {
     let sha1_temp = build_sort_verify(&Sha1);
 
     let mut oracle = PreimageOracle::new();
-    oracle.register("md5", MD5, md5_temp.path(), &words).expect("register md5");
-    oracle.register("sha1", SHA1, sha1_temp.path(), &words).expect("register sha1");
+    oracle
+        .register("md5", MD5, md5_temp.path(), &words)
+        .expect("register md5");
+    oracle
+        .register("sha1", SHA1, sha1_temp.path(), &words)
+        .expect("register sha1");
 
     let md5_hash = hex::encode(Md5.hash(b"banana").expect("hash"));
     let sha1_hash = hex::encode(Sha1.hash(b"banana").expect("hash"));
@@ -300,18 +374,26 @@ fn test_oracle_multi_algorithm() {
     let results = oracle.crack(&[&md5_hash, &sha1_hash], false);
     assert_eq!(results.len(), 2);
 
-    let HashResult::Lookup { matches: matches_0, .. } = &results[0] else {
+    let HashResult::Lookup {
+        matches: matches_0, ..
+    } = &results[0]
+    else {
         panic!("expected Lookup variant for MD5 hash");
     };
-    let full_0: Vec<_> = matches_0.iter()
+    let full_0: Vec<_> = matches_0
+        .iter()
         .filter(|m| m.lookup_match.is_full())
         .collect();
     assert!(!full_0.is_empty(), "MD5 banana should be found");
 
-    let HashResult::Lookup { matches: matches_1, .. } = &results[1] else {
+    let HashResult::Lookup {
+        matches: matches_1, ..
+    } = &results[1]
+    else {
         panic!("expected Lookup variant for SHA1 hash");
     };
-    let full_1: Vec<_> = matches_1.iter()
+    let full_1: Vec<_> = matches_1
+        .iter()
         .filter(|m| m.lookup_match.is_full())
         .collect();
     assert!(!full_1.is_empty(), "SHA1 banana should be found");
@@ -325,7 +407,9 @@ fn test_oracle_multi_algorithm() {
 fn test_duplicate_hash_prefix_collision_block() {
     let words = test_words_path();
     let temp = build_sort_verify(&Md5);
-    let table = IndexFile::open(temp.path()).into_lookup_table(MD5, &words).expect("open");
+    let table = IndexFile::open(temp.path())
+        .into_lookup_table(MD5, &words)
+        .expect("open");
 
     let zzzz_hash = hex::encode(Md5.hash(b"ZzZz").expect("hash"));
     let matches = table.lookup(&zzzz_hash).expect("lookup");

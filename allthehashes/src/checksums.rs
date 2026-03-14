@@ -195,7 +195,10 @@ mod tests {
     }
     #[test]
     fn test_adler32_emoji() {
-        assert_eq!(hex::encode(Adler32.hash("😀".as_bytes()).unwrap()), "075102a8");
+        assert_eq!(
+            hex::encode(Adler32.hash("😀".as_bytes()).unwrap()),
+            "075102a8"
+        );
     }
 
     // CRC-32
@@ -209,7 +212,10 @@ mod tests {
     }
     #[test]
     fn test_crc32_emoji() {
-        assert_eq!(hex::encode(Crc32.hash("😀".as_bytes()).unwrap()), "f4ac78d9");
+        assert_eq!(
+            hex::encode(Crc32.hash("😀".as_bytes()).unwrap()),
+            "f4ac78d9"
+        );
     }
 
     // CRC-32B
@@ -223,7 +229,10 @@ mod tests {
     }
     #[test]
     fn test_crc32b_emoji() {
-        assert_eq!(hex::encode(Crc32b.hash("😀".as_bytes()).unwrap()), "054db544");
+        assert_eq!(
+            hex::encode(Crc32b.hash("😀".as_bytes()).unwrap()),
+            "054db544"
+        );
     }
 
     // CRC-32C
@@ -237,7 +246,10 @@ mod tests {
     }
     #[test]
     fn test_crc32c_emoji() {
-        assert_eq!(hex::encode(Crc32c.hash("😀".as_bytes()).unwrap()), "e3e0db74");
+        assert_eq!(
+            hex::encode(Crc32c.hash("😀".as_bytes()).unwrap()),
+            "e3e0db74"
+        );
     }
 
     // FNV-1 32-bit
@@ -251,7 +263,10 @@ mod tests {
     }
     #[test]
     fn test_fnv132_emoji() {
-        assert_eq!(hex::encode(Fnv132.hash("😀".as_bytes()).unwrap()), "fe02dc3a");
+        assert_eq!(
+            hex::encode(Fnv132.hash("😀".as_bytes()).unwrap()),
+            "fe02dc3a"
+        );
     }
 
     // FNV-1 64-bit
@@ -261,11 +276,17 @@ mod tests {
     }
     #[test]
     fn test_fnv164_hello() {
-        assert_eq!(hex::encode(Fnv164.hash(b"hello").unwrap()), "7b495389bdbdd4c7");
+        assert_eq!(
+            hex::encode(Fnv164.hash(b"hello").unwrap()),
+            "7b495389bdbdd4c7"
+        );
     }
     #[test]
     fn test_fnv164_emoji() {
-        assert_eq!(hex::encode(Fnv164.hash("😀".as_bytes()).unwrap()), "5692bc7c3c90765a");
+        assert_eq!(
+            hex::encode(Fnv164.hash("😀".as_bytes()).unwrap()),
+            "5692bc7c3c90765a"
+        );
     }
 
     // FNV-1a 32-bit
@@ -279,7 +300,10 @@ mod tests {
     }
     #[test]
     fn test_fnv1a32_emoji() {
-        assert_eq!(hex::encode(Fnv1a32.hash("😀".as_bytes()).unwrap()), "33a29608");
+        assert_eq!(
+            hex::encode(Fnv1a32.hash("😀".as_bytes()).unwrap()),
+            "33a29608"
+        );
     }
 
     // FNV-1a 64-bit
@@ -289,11 +313,17 @@ mod tests {
     }
     #[test]
     fn test_fnv1a64_hello() {
-        assert_eq!(hex::encode(Fnv1a64.hash(b"hello").unwrap()), "a430d84680aabd0b");
+        assert_eq!(
+            hex::encode(Fnv1a64.hash(b"hello").unwrap()),
+            "a430d84680aabd0b"
+        );
     }
     #[test]
     fn test_fnv1a64_emoji() {
-        assert_eq!(hex::encode(Fnv1a64.hash("😀".as_bytes()).unwrap()), "feff073875020288");
+        assert_eq!(
+            hex::encode(Fnv1a64.hash("😀".as_bytes()).unwrap()),
+            "feff073875020288"
+        );
     }
 
     // Jenkins One-at-a-time
@@ -307,6 +337,9 @@ mod tests {
     }
     #[test]
     fn test_joaat_emoji() {
-        assert_eq!(hex::encode(Joaat.hash("😀".as_bytes()).unwrap()), "243a5bca");
+        assert_eq!(
+            hex::encode(Joaat.hash("😀".as_bytes()).unwrap()),
+            "243a5bca"
+        );
     }
 }

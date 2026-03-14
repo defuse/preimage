@@ -82,9 +82,7 @@ fn random_entries(n: usize, seed: u64) -> Vec<IndexEntry> {
 /// Generate N entries all with the same hash prefix.
 fn identical_entries(n: usize) -> Vec<IndexEntry> {
     let prefix = [0xAA; 8];
-    (0..n)
-        .map(|i| IndexEntry::new(prefix, i as u64))
-        .collect()
+    (0..n).map(|i| IndexEntry::new(prefix, i as u64)).collect()
 }
 
 /// Generate entries in reverse sorted order.
@@ -132,7 +130,11 @@ fn test_sort_exactly_at_buffer_capacity() {
     let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), ENTRIES_PER_MIB);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved"
+    );
 }
 
 #[test]
@@ -146,7 +148,11 @@ fn test_sort_one_over_buffer_capacity() {
     let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved"
+    );
 }
 
 #[test]
@@ -159,7 +165,11 @@ fn test_sort_one_under_buffer_capacity() {
     let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved"
+    );
 }
 
 #[test]
@@ -172,7 +182,11 @@ fn test_sort_double_buffer_capacity() {
     let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved"
+    );
 }
 
 #[test]
@@ -184,7 +198,11 @@ fn test_sort_triple_buffer_capacity() {
     let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), n);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved"
+    );
 }
 
 // ============================================================
@@ -215,7 +233,11 @@ fn test_sort_file_only_small() {
     let sorted = sort_file_only(&entries);
 
     assert_eq!(sorted.len(), 100);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved"
+    );
 }
 
 #[test]
@@ -239,7 +261,11 @@ fn test_sort_file_only_with_collisions() {
     let sorted = sort_file_only(&entries);
 
     assert_eq!(sorted.len(), 130);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved"
+    );
 }
 
 #[test]
@@ -265,8 +291,7 @@ fn test_words_sort_all_in_memory() {
         .join("test_data")
         .join("words.txt");
     let temp = NamedTempFile::new().expect("temp file");
-    let index = IndexFile::build(&preimage::Md5, &words, temp.path(), None)
-        .expect("build");
+    let index = IndexFile::build(&preimage::Md5, &words, temp.path(), None).expect("build");
 
     let before = fingerprint(&read_all_entries(temp.path()));
     index.sort(1024 * 1024, None).expect("sort failed");
@@ -356,7 +381,9 @@ fn test_sort_all_identical_exceeding_buffer() {
     let f = write_entries(&entries);
     let index = IndexFile::open(f.path());
 
-    index.sort(1024 * 1024, None).expect("sort all-identical exceeding buffer");
+    index
+        .sort(1024 * 1024, None)
+        .expect("sort all-identical exceeding buffer");
     assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
@@ -391,7 +418,9 @@ fn test_sort_reverse_sorted_exceeding_buffer() {
     let f = write_entries(&entries);
     let index = IndexFile::open(f.path());
 
-    index.sort(1024 * 1024, None).expect("sort reverse exceeding buffer");
+    index
+        .sort(1024 * 1024, None)
+        .expect("sort reverse exceeding buffer");
     assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
@@ -459,18 +488,15 @@ fn test_sort_three_entries_all_orderings() {
     for (i, perm) in permutations.iter().enumerate() {
         let sorted = sort_and_verify(perm);
         assert_eq!(
-            sorted[0].hash_prefix,
-            [0x11; 8],
+            sorted[0].hash_prefix, [0x11; 8],
             "permutation {i}: first should be 0x11"
         );
         assert_eq!(
-            sorted[1].hash_prefix,
-            [0x22; 8],
+            sorted[1].hash_prefix, [0x22; 8],
             "permutation {i}: second should be 0x22"
         );
         assert_eq!(
-            sorted[2].hash_prefix,
-            [0x33; 8],
+            sorted[2].hash_prefix, [0x33; 8],
             "permutation {i}: third should be 0x33"
         );
     }
@@ -495,7 +521,11 @@ fn test_sort_preserves_positions() {
     let sorted = sort_and_verify(&entries);
 
     assert_eq!(sorted.len(), 200);
-    assert_eq!(fingerprint(&sorted), before, "all (prefix, position) pairs must survive sorting");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all (prefix, position) pairs must survive sorting"
+    );
 }
 
 #[test]
@@ -520,7 +550,11 @@ fn test_sort_preserves_positions_file_based() {
 
     let sorted = read_all_entries(f.path());
     assert_eq!(sorted.len(), n);
-    assert_eq!(fingerprint(&sorted), before, "all entries must be preserved in file-based sort");
+    assert_eq!(
+        fingerprint(&sorted),
+        before,
+        "all entries must be preserved in file-based sort"
+    );
 }
 
 // ============================================================
@@ -536,7 +570,10 @@ fn test_sort_rejects_invalid_file_size() {
 
     let index = IndexFile::open(f.path());
     let result = index.sort(1024 * 1024, None);
-    assert!(result.is_err(), "should reject file size not divisible by 14");
+    assert!(
+        result.is_err(),
+        "should reject file size not divisible by 14"
+    );
 }
 
 // ============================================================

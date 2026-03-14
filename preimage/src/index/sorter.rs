@@ -5,7 +5,7 @@ use std::path::Path;
 use anyhow::{bail, Result};
 use indicatif::ProgressBar;
 
-use crate::entry::{IndexEntry, ENTRY_SIZE};
+use super::entry::{IndexEntry, ENTRY_SIZE};
 
 impl super::IndexFile {
     /// Sort the index file in-place with the given memory budget (in bytes).
@@ -52,7 +52,11 @@ impl IndexSorter {
 
     /// Sort an index file in-place using hybrid quicksort (in-memory for
     /// partitions that fit, file-based for larger ones).
-    pub(crate) fn sort_file(&mut self, index_path: &Path, progress: Option<&ProgressBar>) -> Result<()> {
+    pub(crate) fn sort_file(
+        &mut self,
+        index_path: &Path,
+        progress: Option<&ProgressBar>,
+    ) -> Result<()> {
         let (mut file, num_entries) = self.open_and_validate(index_path)?;
         if num_entries <= 1 {
             return Ok(());
@@ -64,7 +68,13 @@ impl IndexSorter {
         self.entries_sorted = 0;
         self.total_entries = num_entries;
 
-        self.quicksort_file(&mut file, 0, num_entries as i64 - 1, buf_count as i64, progress)?;
+        self.quicksort_file(
+            &mut file,
+            0,
+            num_entries as i64 - 1,
+            buf_count as i64,
+            progress,
+        )?;
 
         Ok(())
     }
@@ -216,7 +226,13 @@ impl IndexSorter {
 
         let partition_size = upper - lower + 1;
         if let Some(pb) = progress {
-            self.update_progress(pb, &format!("partitioning {} entries", format_count(partition_size as u64)));
+            self.update_progress(
+                pb,
+                &format!(
+                    "partitioning {} entries",
+                    format_count(partition_size as u64)
+                ),
+            );
         }
 
         let mut store_index = lower;
@@ -272,7 +288,10 @@ fn read_entry_at(file: &mut File, index: i64) -> Result<IndexEntry> {
     let mut position = [0u8; 6];
     file.read_exact(&mut hash_prefix)?;
     file.read_exact(&mut position)?;
-    Ok(IndexEntry { hash_prefix, position })
+    Ok(IndexEntry {
+        hash_prefix,
+        position,
+    })
 }
 
 fn write_entry_at(file: &mut File, index: i64, entry: &IndexEntry) -> Result<()> {
@@ -287,9 +306,9 @@ fn write_entry_at(file: &mut File, index: i64, entry: &IndexEntry) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::index::builder::IndexBuilder;
     use crate::index::checker::check_sorted;
     use crate::Md5;
-    use crate::index::builder::IndexBuilder;
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {
@@ -302,8 +321,7 @@ mod tests {
     #[test]
     fn test_sort_small_file() {
         let output = NamedTempFile::new().expect("temp file");
-        IndexBuilder::build(&Md5, &test_words_path(), output.path(), None)
-            .expect("build failed");
+        IndexBuilder::build(&Md5, &test_words_path(), output.path(), None).expect("build failed");
 
         let mut sorter = IndexSorter::new(1024 * 1024);
         sorter.sort_file(output.path(), None).expect("sort failed");
@@ -318,12 +336,15 @@ mod tests {
     fn test_sort_already_sorted() {
         // Create, sort, then sort again — should be idempotent
         let output = NamedTempFile::new().expect("temp file");
-        IndexBuilder::build(&Md5, &test_words_path(), output.path(), None)
-            .expect("build failed");
+        IndexBuilder::build(&Md5, &test_words_path(), output.path(), None).expect("build failed");
 
         let mut sorter = IndexSorter::new(1024 * 1024);
-        sorter.sort_file(output.path(), None).expect("first sort failed");
-        sorter.sort_file(output.path(), None).expect("second sort failed");
+        sorter
+            .sort_file(output.path(), None)
+            .expect("first sort failed");
+        sorter
+            .sort_file(output.path(), None)
+            .expect("second sort failed");
 
         assert!(
             check_sorted(output.path(), None).expect("check failed"),
@@ -342,7 +363,9 @@ mod tests {
         // The words.txt has ~225 entries. Use a buffer of 10 entries to force
         // file-based partitioning.
         let mut sorter = IndexSorter::new(10 * ENTRY_SIZE);
-        sorter.sort_file(output.path(), None).expect("sort with tiny buffer failed");
+        sorter
+            .sort_file(output.path(), None)
+            .expect("sort with tiny buffer failed");
 
         assert!(
             check_sorted(output.path(), None).expect("check failed"),
@@ -355,7 +378,9 @@ mod tests {
         let output = NamedTempFile::new().expect("temp file");
         // Empty file is valid (0 entries)
         let mut sorter = IndexSorter::new(1024 * 1024);
-        sorter.sort_file(output.path(), None).expect("sort empty file should succeed");
+        sorter
+            .sort_file(output.path(), None)
+            .expect("sort empty file should succeed");
     }
 
     #[test]
@@ -366,7 +391,9 @@ mod tests {
         IndexBuilder::build(&Md5, wordlist.path(), output.path(), None).expect("build");
 
         let mut sorter = IndexSorter::new(1024 * 1024);
-        sorter.sort_file(output.path(), None).expect("sort single entry");
+        sorter
+            .sort_file(output.path(), None)
+            .expect("sort single entry");
         assert!(check_sorted(output.path(), None).expect("check"));
     }
 }

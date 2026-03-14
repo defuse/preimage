@@ -1,6 +1,6 @@
+use crate::HashAlgorithm;
 use digest::Digest;
 use hmac::{Hmac, Mac};
-use crate::HashAlgorithm;
 
 /// MD5(MD5): compute MD5, hex-encode, then MD5 the hex string.
 pub struct Md5Md5;
@@ -52,8 +52,8 @@ const QUBES_DEFAULT_BACKUP_HEADER: &[u8] =
 impl HashAlgorithm for QubesV31 {
     fn hash(&self, input: &[u8]) -> Option<Vec<u8>> {
         type HmacSha512 = Hmac<sha2::Sha512>;
-        let mut mac = HmacSha512::new_from_slice(input)
-            .expect("HMAC-SHA512 accepts keys of any length");
+        let mut mac =
+            HmacSha512::new_from_slice(input).expect("HMAC-SHA512 accepts keys of any length");
         mac.update(QUBES_DEFAULT_BACKUP_HEADER);
         Some(mac.finalize().into_bytes().to_vec())
     }
@@ -98,26 +98,38 @@ mod tests {
     #[test]
     fn test_mysql41_empty() {
         let hash = MySql41.hash(b"").expect("should not fail");
-        assert_eq!(hex::encode(&hash), "be1bdec0aa74b4dcb079943e70528096cca985f8");
+        assert_eq!(
+            hex::encode(&hash),
+            "be1bdec0aa74b4dcb079943e70528096cca985f8"
+        );
     }
 
     #[test]
     fn test_mysql41_hello() {
         let hash = MySql41.hash(b"hello").expect("should not fail");
-        assert_eq!(hex::encode(&hash), "6b4f89a54e2d27ecd7e8da05b4ab8fd9d1d8b119");
+        assert_eq!(
+            hex::encode(&hash),
+            "6b4f89a54e2d27ecd7e8da05b4ab8fd9d1d8b119"
+        );
     }
 
     #[test]
     fn test_mysql41_emoji() {
         let hash = MySql41.hash("😀".as_bytes()).expect("should not fail");
-        assert_eq!(hex::encode(&hash), "b55edf8cd9ee23bfc3684ca55dcfb5774d18bb51");
+        assert_eq!(
+            hex::encode(&hash),
+            "b55edf8cd9ee23bfc3684ca55dcfb5774d18bb51"
+        );
     }
 
     #[test]
     fn test_mysql41_password() {
         let hash = MySql41.hash(b"password").expect("should not fail");
         // MySQL PASSWORD() output (without the leading *)
-        assert_eq!(hex::encode(&hash), "2470c0c06dee42fd1618bb99005adca2ec9d1e19");
+        assert_eq!(
+            hex::encode(&hash),
+            "2470c0c06dee42fd1618bb99005adca2ec9d1e19"
+        );
     }
 
     // QubesV31 - HMAC-SHA512 with specific backup header (no external reference)

@@ -14,7 +14,10 @@ use rand::{Rng, SeedableRng};
 use preimage::{get_algorithm, HashAlgorithm, IndexFile};
 
 #[derive(Parser)]
-#[command(name = "benchmark", about = "Benchmark preimage index build, sort, and lookup performance")]
+#[command(
+    name = "benchmark",
+    about = "Benchmark preimage index build, sort, and lookup performance"
+)]
 struct Cli {
     /// Number of wordlist entries (suffixes: K=thousands, M=millions, G=billions)
     #[arg(long, value_parser = parse_entries)]
@@ -97,10 +100,11 @@ fn parse_memory_size(s: &str) -> Result<usize, String> {
 fn main() {
     let cli = Cli::parse();
 
-    let algorithm: &'static dyn HashAlgorithm = get_algorithm(&cli.algorithm).unwrap_or_else(|| {
-        eprintln!("Unknown algorithm: {}", cli.algorithm);
-        std::process::exit(1);
-    });
+    let algorithm: &'static dyn HashAlgorithm =
+        get_algorithm(&cli.algorithm).unwrap_or_else(|| {
+            eprintln!("Unknown algorithm: {}", cli.algorithm);
+            std::process::exit(1);
+        });
 
     println!("=== Configuration ===");
     println!("Algorithm:    {}", cli.algorithm);
@@ -112,8 +116,12 @@ fn main() {
 
     fs::create_dir_all(&cli.data_dir).expect("failed to create data directory");
 
-    let wordlist_path = cli.data_dir.join(format!("{}_{}.txt", cli.algorithm, cli.entries));
-    let index_path = cli.data_dir.join(format!("{}_{}.idx", cli.algorithm, cli.entries));
+    let wordlist_path = cli
+        .data_dir
+        .join(format!("{}_{}.txt", cli.algorithm, cli.entries));
+    let index_path = cli
+        .data_dir
+        .join(format!("{}_{}.idx", cli.algorithm, cli.entries));
 
     if cli.clean {
         for path in [&wordlist_path, &index_path] {
@@ -171,13 +179,19 @@ fn progress_bar(total: u64, msg: &str) -> ProgressBar {
 }
 
 fn file_size(path: &Path) -> String {
-    let size = fs::metadata(path).expect("failed to read file metadata").len();
+    let size = fs::metadata(path)
+        .expect("failed to read file metadata")
+        .len();
     SizeFormatter::new(size, BINARY).to_string()
 }
 
 fn generate_wordlist(path: &Path, entries: u64) {
     if path.exists() {
-        println!("Wordlist:     {} ({}, exists, skipped)", path.display(), file_size(path));
+        println!(
+            "Wordlist:     {} ({}, exists, skipped)",
+            path.display(),
+            file_size(path)
+        );
         return;
     }
 
@@ -208,11 +222,19 @@ fn generate_wordlist(path: &Path, entries: u64) {
 }
 
 /// Returns (entry_count, freshly_built).
-fn build_index(algorithm: &'static dyn HashAlgorithm, wordlist_path: &Path, index_path: &Path) -> (u64, bool) {
+fn build_index(
+    algorithm: &'static dyn HashAlgorithm,
+    wordlist_path: &Path,
+    index_path: &Path,
+) -> (u64, bool) {
     if index_path.exists() {
         let index = IndexFile::open(index_path);
         let count = index.entry_count().expect("failed to read entry count");
-        println!("Index build:  {} ({}, exists, skipped)", index_path.display(), file_size(index_path));
+        println!(
+            "Index build:  {} ({}, exists, skipped)",
+            index_path.display(),
+            file_size(index_path)
+        );
         return (count, false);
     }
 
@@ -251,7 +273,9 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_
     let check_pb = progress_bar(entry_count, "Checking sort");
     let check_start = Instant::now();
     let index = IndexFile::open(index_path);
-    let sorted = index.check_sorted(Some(&check_pb)).expect("failed to check sort status");
+    let sorted = index
+        .check_sorted(Some(&check_pb))
+        .expect("failed to check sort status");
     check_pb.finish_and_clear();
     let check_elapsed = check_start.elapsed();
     let check_secs = check_elapsed.as_secs_f64();
@@ -281,7 +305,9 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_
 
     let start = Instant::now();
     let index = IndexFile::open(index_path);
-    index.sort(memory_bytes, Some(&pb)).expect("failed to sort index");
+    index
+        .sort(memory_bytes, Some(&pb))
+        .expect("failed to sort index");
     pb.finish_and_clear();
     let elapsed = start.elapsed();
 
@@ -370,7 +396,11 @@ fn run_lookup_benchmark(
                 pb_clone.set_position(secs.min(duration_secs));
                 let queries = query_count_clone.load(Ordering::Relaxed);
                 let qps = queries as f64 / elapsed.as_secs_f64();
-                pb_clone.set_message(format!("{} queries, {:.0} queries/sec", format_count(queries), qps));
+                pb_clone.set_message(format!(
+                    "{} queries, {:.0} queries/sec",
+                    format_count(queries),
+                    qps
+                ));
             }
             stop_clone.store(true, Ordering::Relaxed);
         });
@@ -390,7 +420,10 @@ fn run_lookup_benchmark(
                         let batch_start = Instant::now();
                         for _ in 0..batch {
                             let hash_hex = generate_lookup_hash(
-                                algorithm, &mut rng, entry_count, hash_hex_len,
+                                algorithm,
+                                &mut rng,
+                                entry_count,
+                                hash_hex_len,
                             );
                             let _ = table.lookup(&hash_hex);
                         }
@@ -440,7 +473,10 @@ fn run_lookup_benchmark(
     let p99 = all[((all.len() as f64 * 0.99) as usize).min(all.len() - 1)];
 
     println!();
-    println!("=== Batch Latency ({} queries/batch) ===", format_count(batch as u64));
+    println!(
+        "=== Batch Latency ({} queries/batch) ===",
+        format_count(batch as u64)
+    );
     println!("Min:     {}", format_duration(min));
     println!("Median:  {}", format_duration(median));
     println!("P95:     {}", format_duration(p95));

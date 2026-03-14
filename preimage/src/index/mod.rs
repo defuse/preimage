@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 pub(crate) mod builder;
-pub(crate) mod sorter;
 pub(crate) mod checker;
+pub mod entry;
 pub mod lookup;
+pub(crate) mod sorter;
 
 /// An index file on disk mapping hash prefixes to wordlist positions.
 ///
@@ -16,7 +17,9 @@ pub struct IndexFile {
 impl IndexFile {
     /// Reference an existing index file at the given path.
     pub fn open(path: impl AsRef<Path>) -> Self {
-        Self { path: path.as_ref().to_path_buf() }
+        Self {
+            path: path.as_ref().to_path_buf(),
+        }
     }
 
     /// Get the path to the index file.
@@ -27,13 +30,13 @@ impl IndexFile {
     /// Count the number of entries in the index file.
     pub fn entry_count(&self) -> anyhow::Result<u64> {
         let size = std::fs::metadata(&self.path)?.len();
-        if size % crate::entry::ENTRY_SIZE as u64 != 0 {
+        if size % entry::ENTRY_SIZE as u64 != 0 {
             anyhow::bail!(
                 "index file size {} is not a multiple of entry size {}",
                 size,
-                crate::entry::ENTRY_SIZE
+                entry::ENTRY_SIZE
             );
         }
-        Ok(size / crate::entry::ENTRY_SIZE as u64)
+        Ok(size / entry::ENTRY_SIZE as u64)
     }
 }

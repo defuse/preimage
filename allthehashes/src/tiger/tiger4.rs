@@ -269,13 +269,21 @@ const TABLE: [u64; 1024] = [
 ];
 
 #[inline]
-fn t1(i: usize) -> u64 { TABLE[i] }
+fn t1(i: usize) -> u64 {
+    TABLE[i]
+}
 #[inline]
-fn t2(i: usize) -> u64 { TABLE[256 + i] }
+fn t2(i: usize) -> u64 {
+    TABLE[256 + i]
+}
 #[inline]
-fn t3(i: usize) -> u64 { TABLE[512 + i] }
+fn t3(i: usize) -> u64 {
+    TABLE[512 + i]
+}
 #[inline]
-fn t4(i: usize) -> u64 { TABLE[768 + i] }
+fn t4(i: usize) -> u64 {
+    TABLE[768 + i]
+}
 
 /// Key schedule step
 #[inline]
@@ -457,4 +465,3 @@ pub fn tiger192_4(data: &[u8]) -> [u8; 24] {
     ctx.update(data);
     ctx.finalize()
 }
-

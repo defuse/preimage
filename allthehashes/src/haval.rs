@@ -13,8 +13,7 @@
 
 /// Initial state values
 const D0: [u32; 8] = [
-    0x243F6A88, 0x85A308D3, 0x13198A2E, 0x03707344,
-    0xA4093822, 0x299F31D0, 0x082EFA98, 0xEC4E6C89,
+    0x243F6A88, 0x85A308D3, 0x13198A2E, 0x03707344, 0xA4093822, 0x299F31D0, 0x082EFA98, 0xEC4E6C89,
 ];
 
 /// Round constants for pass 2
@@ -51,60 +50,52 @@ const K5: [u32; 32] = [
 
 /// Message word index permutation for pass 2
 const I2: [usize; 32] = [
-    5, 14, 26, 18, 11, 28, 7, 16, 0, 23, 20, 22, 1, 10, 4, 8,
-    30, 3, 21, 9, 17, 24, 29, 6, 19, 12, 15, 13, 2, 25, 31, 27,
+    5, 14, 26, 18, 11, 28, 7, 16, 0, 23, 20, 22, 1, 10, 4, 8, 30, 3, 21, 9, 17, 24, 29, 6, 19, 12,
+    15, 13, 2, 25, 31, 27,
 ];
 
 /// Message word index permutation for pass 3
 const I3: [usize; 32] = [
-    19, 9, 4, 20, 28, 17, 8, 22, 29, 14, 25, 12, 24, 30, 16, 26,
-    31, 15, 7, 3, 1, 0, 18, 27, 13, 6, 21, 10, 23, 11, 5, 2,
+    19, 9, 4, 20, 28, 17, 8, 22, 29, 14, 25, 12, 24, 30, 16, 26, 31, 15, 7, 3, 1, 0, 18, 27, 13, 6,
+    21, 10, 23, 11, 5, 2,
 ];
 
 /// Message word index permutation for pass 4
 const I4: [usize; 32] = [
-    24, 4, 0, 14, 2, 7, 28, 23, 26, 6, 30, 20, 18, 25, 19, 3,
-    22, 11, 31, 21, 8, 27, 12, 9, 1, 29, 5, 15, 17, 10, 16, 13,
+    24, 4, 0, 14, 2, 7, 28, 23, 26, 6, 30, 20, 18, 25, 19, 3, 22, 11, 31, 21, 8, 27, 12, 9, 1, 29,
+    5, 15, 17, 10, 16, 13,
 ];
 
 /// Message word index permutation for pass 5
 const I5: [usize; 32] = [
-    27, 3, 21, 26, 17, 11, 20, 29, 19, 0, 12, 7, 13, 8, 31, 10,
-    5, 9, 14, 30, 18, 6, 28, 24, 2, 23, 16, 22, 4, 1, 25, 15,
+    27, 3, 21, 26, 17, 11, 20, 29, 19, 0, 12, 7, 13, 8, 31, 10, 5, 9, 14, 30, 18, 6, 28, 24, 2, 23,
+    16, 22, 4, 1, 25, 15,
 ];
 
 /// E-state index tables (M0-M7)
 const M0: [usize; 32] = [
-    0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1,
-    0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1,
+    0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1,
 ];
 const M1: [usize; 32] = [
-    1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2,
-    1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2,
+    1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2,
 ];
 const M2: [usize; 32] = [
-    2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3,
-    2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3,
+    2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3,
 ];
 const M3: [usize; 32] = [
-    3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4,
-    3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4,
+    3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4,
 ];
 const M4: [usize; 32] = [
-    4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5,
-    4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5,
+    4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5,
 ];
 const M5: [usize; 32] = [
-    5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6,
-    5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6,
+    5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6,
 ];
 const M6: [usize; 32] = [
-    6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7,
-    6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7,
+    6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7,
 ];
 const M7: [usize; 32] = [
-    7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0,
-    7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0,
+    7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0,
 ];
 
 /// Rotate right
@@ -122,8 +113,15 @@ fn f1(x6: u32, x5: u32, x4: u32, x3: u32, x2: u32, x1: u32, x0: u32) -> u32 {
 /// F2 boolean function
 #[inline]
 fn f2(x6: u32, x5: u32, x4: u32, x3: u32, x2: u32, x1: u32, x0: u32) -> u32 {
-    (x1 & x2 & x3) ^ (x2 & x4 & x5) ^ (x1 & x2) ^ (x1 & x4)
-        ^ (x2 & x6) ^ (x3 & x5) ^ (x4 & x5) ^ (x0 & x2) ^ x0
+    (x1 & x2 & x3)
+        ^ (x2 & x4 & x5)
+        ^ (x1 & x2)
+        ^ (x1 & x4)
+        ^ (x2 & x6)
+        ^ (x3 & x5)
+        ^ (x4 & x5)
+        ^ (x0 & x2)
+        ^ x0
 }
 
 /// F3 boolean function
@@ -135,9 +133,18 @@ fn f3(x6: u32, x5: u32, x4: u32, x3: u32, x2: u32, x1: u32, x0: u32) -> u32 {
 /// F4 boolean function
 #[inline]
 fn f4(x6: u32, x5: u32, x4: u32, x3: u32, x2: u32, x1: u32, x0: u32) -> u32 {
-    (x1 & x2 & x3) ^ (x2 & x4 & x5) ^ (x3 & x4 & x6)
-        ^ (x1 & x4) ^ (x2 & x6) ^ (x3 & x4) ^ (x3 & x5)
-        ^ (x3 & x6) ^ (x4 & x5) ^ (x4 & x6) ^ (x0 & x4) ^ x0
+    (x1 & x2 & x3)
+        ^ (x2 & x4 & x5)
+        ^ (x3 & x4 & x6)
+        ^ (x1 & x4)
+        ^ (x2 & x6)
+        ^ (x3 & x4)
+        ^ (x3 & x5)
+        ^ (x3 & x6)
+        ^ (x4 & x5)
+        ^ (x4 & x6)
+        ^ (x0 & x4)
+        ^ x0
 }
 
 /// F5 boolean function
@@ -158,7 +165,9 @@ fn transform3(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 1 (F1)
     for i in 0..32 {
-        let f = f1(e[M1[i]], e[M0[i]], e[M3[i]], e[M5[i]], e[M6[i]], e[M2[i]], e[M4[i]]);
+        let f = f1(
+            e[M1[i]], e[M0[i]], e[M3[i]], e[M5[i]], e[M6[i]], e[M2[i]], e[M4[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[i]);
@@ -166,7 +175,9 @@ fn transform3(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 2 (F2)
     for i in 0..32 {
-        let f = f2(e[M4[i]], e[M2[i]], e[M1[i]], e[M0[i]], e[M5[i]], e[M3[i]], e[M6[i]]);
+        let f = f2(
+            e[M4[i]], e[M2[i]], e[M1[i]], e[M0[i]], e[M5[i]], e[M3[i]], e[M6[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I2[i]])
@@ -175,7 +186,9 @@ fn transform3(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 3 (F3)
     for i in 0..32 {
-        let f = f3(e[M6[i]], e[M1[i]], e[M2[i]], e[M3[i]], e[M4[i]], e[M5[i]], e[M0[i]]);
+        let f = f3(
+            e[M6[i]], e[M1[i]], e[M2[i]], e[M3[i]], e[M4[i]], e[M5[i]], e[M0[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I3[i]])
@@ -199,7 +212,9 @@ fn transform4(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 1 (F1) - different E ordering for 4-pass
     for i in 0..32 {
-        let f = f1(e[M2[i]], e[M6[i]], e[M1[i]], e[M4[i]], e[M5[i]], e[M3[i]], e[M0[i]]);
+        let f = f1(
+            e[M2[i]], e[M6[i]], e[M1[i]], e[M4[i]], e[M5[i]], e[M3[i]], e[M0[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[i]);
@@ -207,7 +222,9 @@ fn transform4(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 2 (F2)
     for i in 0..32 {
-        let f = f2(e[M3[i]], e[M5[i]], e[M2[i]], e[M0[i]], e[M1[i]], e[M6[i]], e[M4[i]]);
+        let f = f2(
+            e[M3[i]], e[M5[i]], e[M2[i]], e[M0[i]], e[M1[i]], e[M6[i]], e[M4[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I2[i]])
@@ -216,7 +233,9 @@ fn transform4(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 3 (F3)
     for i in 0..32 {
-        let f = f3(e[M1[i]], e[M4[i]], e[M3[i]], e[M6[i]], e[M0[i]], e[M2[i]], e[M5[i]]);
+        let f = f3(
+            e[M1[i]], e[M4[i]], e[M3[i]], e[M6[i]], e[M0[i]], e[M2[i]], e[M5[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I3[i]])
@@ -225,7 +244,9 @@ fn transform4(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 4 (F4)
     for i in 0..32 {
-        let f = f4(e[M6[i]], e[M4[i]], e[M0[i]], e[M5[i]], e[M2[i]], e[M1[i]], e[M3[i]]);
+        let f = f4(
+            e[M6[i]], e[M4[i]], e[M0[i]], e[M5[i]], e[M2[i]], e[M1[i]], e[M3[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I4[i]])
@@ -248,7 +269,9 @@ fn transform5(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 1 (F1) - different E ordering for 5-pass
     for i in 0..32 {
-        let f = f1(e[M3[i]], e[M4[i]], e[M1[i]], e[M0[i]], e[M5[i]], e[M2[i]], e[M6[i]]);
+        let f = f1(
+            e[M3[i]], e[M4[i]], e[M1[i]], e[M0[i]], e[M5[i]], e[M2[i]], e[M6[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[i]);
@@ -256,7 +279,9 @@ fn transform5(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 2 (F2)
     for i in 0..32 {
-        let f = f2(e[M6[i]], e[M2[i]], e[M1[i]], e[M0[i]], e[M3[i]], e[M4[i]], e[M5[i]]);
+        let f = f2(
+            e[M6[i]], e[M2[i]], e[M1[i]], e[M0[i]], e[M3[i]], e[M4[i]], e[M5[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I2[i]])
@@ -265,7 +290,9 @@ fn transform5(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 3 (F3)
     for i in 0..32 {
-        let f = f3(e[M2[i]], e[M6[i]], e[M0[i]], e[M4[i]], e[M3[i]], e[M1[i]], e[M5[i]]);
+        let f = f3(
+            e[M2[i]], e[M6[i]], e[M0[i]], e[M4[i]], e[M3[i]], e[M1[i]], e[M5[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I3[i]])
@@ -274,7 +301,9 @@ fn transform5(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 4 (F4)
     for i in 0..32 {
-        let f = f4(e[M1[i]], e[M5[i]], e[M3[i]], e[M2[i]], e[M0[i]], e[M4[i]], e[M6[i]]);
+        let f = f4(
+            e[M1[i]], e[M5[i]], e[M3[i]], e[M2[i]], e[M0[i]], e[M4[i]], e[M6[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I4[i]])
@@ -283,7 +312,9 @@ fn transform5(state: &mut [u32; 8], block: &[u8; 128]) {
 
     // Pass 5 (F5)
     for i in 0..32 {
-        let f = f5(e[M2[i]], e[M5[i]], e[M0[i]], e[M6[i]], e[M4[i]], e[M3[i]], e[M1[i]]);
+        let f = f5(
+            e[M2[i]], e[M5[i]], e[M0[i]], e[M6[i]], e[M4[i]], e[M3[i]], e[M1[i]],
+        );
         e[7 - (i % 8)] = rotr(f, 7)
             .wrapping_add(rotr(e[M7[i]], 11))
             .wrapping_add(x[I5[i]])
@@ -370,7 +401,11 @@ impl HavalContext {
 
         // Pad to 118 mod 128
         let index = ((self.count[0] >> 3) & 0x7f) as usize;
-        let pad_len = if index < 118 { 118 - index } else { 246 - index };
+        let pad_len = if index < 118 {
+            118 - index
+        } else {
+            246 - index
+        };
 
         // Padding starts with 0x01
         let mut padding = vec![0u8; pad_len];
@@ -452,18 +487,24 @@ impl HavalContext {
                 ));
             }
             192 => {
-                self.state[5] = self.state[5]
-                    .wrapping_add(((self.state[7] & 0xFC000000) | (self.state[6] & 0x03E00000)) >> 21);
-                self.state[4] = self.state[4]
-                    .wrapping_add(((self.state[7] & 0x03E00000) | (self.state[6] & 0x001F0000)) >> 16);
-                self.state[3] = self.state[3]
-                    .wrapping_add(((self.state[7] & 0x001F0000) | (self.state[6] & 0x0000FC00)) >> 10);
-                self.state[2] = self.state[2]
-                    .wrapping_add(((self.state[7] & 0x0000FC00) | (self.state[6] & 0x000003E0)) >> 5);
+                self.state[5] = self.state[5].wrapping_add(
+                    ((self.state[7] & 0xFC000000) | (self.state[6] & 0x03E00000)) >> 21,
+                );
+                self.state[4] = self.state[4].wrapping_add(
+                    ((self.state[7] & 0x03E00000) | (self.state[6] & 0x001F0000)) >> 16,
+                );
+                self.state[3] = self.state[3].wrapping_add(
+                    ((self.state[7] & 0x001F0000) | (self.state[6] & 0x0000FC00)) >> 10,
+                );
+                self.state[2] = self.state[2].wrapping_add(
+                    ((self.state[7] & 0x0000FC00) | (self.state[6] & 0x000003E0)) >> 5,
+                );
                 self.state[1] = self.state[1]
                     .wrapping_add((self.state[7] & 0x000003E0) | (self.state[6] & 0x0000001F));
-                self.state[0] = self.state[0]
-                    .wrapping_add(rotr((self.state[7] & 0x0000001F) | (self.state[6] & 0xFC000000), 26));
+                self.state[0] = self.state[0].wrapping_add(rotr(
+                    (self.state[7] & 0x0000001F) | (self.state[6] & 0xFC000000),
+                    26,
+                ));
             }
             224 => {
                 self.state[6] = self.state[6].wrapping_add(self.state[7] & 0x0000000F);
@@ -600,126 +641,216 @@ mod tests {
 
     #[test]
     fn test_haval128_3_hello() {
-        assert_eq!(hex::encode(haval128_3(b"hello")), "85c3e4fac0ba4d85519978fdc3d1d9be");
+        assert_eq!(
+            hex::encode(haval128_3(b"hello")),
+            "85c3e4fac0ba4d85519978fdc3d1d9be"
+        );
     }
     #[test]
     fn test_haval128_4_hello() {
-        assert_eq!(hex::encode(haval128_4(b"hello")), "fe10754e0b31d69d4ece9c7a46e044e5");
+        assert_eq!(
+            hex::encode(haval128_4(b"hello")),
+            "fe10754e0b31d69d4ece9c7a46e044e5"
+        );
     }
     #[test]
     fn test_haval128_5_hello() {
-        assert_eq!(hex::encode(haval128_5(b"hello")), "d20e920d5be9d9d34855accb501d1987");
+        assert_eq!(
+            hex::encode(haval128_5(b"hello")),
+            "d20e920d5be9d9d34855accb501d1987"
+        );
     }
     #[test]
     fn test_haval160_3_hello() {
-        assert_eq!(hex::encode(haval160_3(b"hello")), "0e53b29ad41cea507a343cdd8b62106864f6b3fe");
+        assert_eq!(
+            hex::encode(haval160_3(b"hello")),
+            "0e53b29ad41cea507a343cdd8b62106864f6b3fe"
+        );
     }
     #[test]
     fn test_haval160_4_hello() {
-        assert_eq!(hex::encode(haval160_4(b"hello")), "b9afd44b015f8afce44e4e02d8b908ed857afbd1");
+        assert_eq!(
+            hex::encode(haval160_4(b"hello")),
+            "b9afd44b015f8afce44e4e02d8b908ed857afbd1"
+        );
     }
     #[test]
     fn test_haval160_5_hello() {
-        assert_eq!(hex::encode(haval160_5(b"hello")), "dac5e2024bfea142e53d1422b90c9ee2c8187cc6");
+        assert_eq!(
+            hex::encode(haval160_5(b"hello")),
+            "dac5e2024bfea142e53d1422b90c9ee2c8187cc6"
+        );
     }
     #[test]
     fn test_haval192_3_hello() {
-        assert_eq!(hex::encode(haval192_3(b"hello")), "bfaf81218bbb8ee51b600f5088c4b8601558ff56e2de1c4f");
+        assert_eq!(
+            hex::encode(haval192_3(b"hello")),
+            "bfaf81218bbb8ee51b600f5088c4b8601558ff56e2de1c4f"
+        );
     }
     #[test]
     fn test_haval192_4_hello() {
-        assert_eq!(hex::encode(haval192_4(b"hello")), "ae73833a09e84691d0214f360ee5027396f12599e3618118");
+        assert_eq!(
+            hex::encode(haval192_4(b"hello")),
+            "ae73833a09e84691d0214f360ee5027396f12599e3618118"
+        );
     }
     #[test]
     fn test_haval192_5_hello() {
-        assert_eq!(hex::encode(haval192_5(b"hello")), "bbb99b1e989ec3174019b20792fd92dd67175c2ff6ce5965");
+        assert_eq!(
+            hex::encode(haval192_5(b"hello")),
+            "bbb99b1e989ec3174019b20792fd92dd67175c2ff6ce5965"
+        );
     }
     #[test]
     fn test_haval224_3_hello() {
-        assert_eq!(hex::encode(haval224_3(b"hello")), "92d0e3354be5d525616f217660e0f860b5d472a9cb99d6766be90b15");
+        assert_eq!(
+            hex::encode(haval224_3(b"hello")),
+            "92d0e3354be5d525616f217660e0f860b5d472a9cb99d6766be90b15"
+        );
     }
     #[test]
     fn test_haval224_4_hello() {
-        assert_eq!(hex::encode(haval224_4(b"hello")), "e1ad67dc7a5901496b15dab92c2715de4b120af2baf661ecd9266317");
+        assert_eq!(
+            hex::encode(haval224_4(b"hello")),
+            "e1ad67dc7a5901496b15dab92c2715de4b120af2baf661ecd9266317"
+        );
     }
     #[test]
     fn test_haval224_5_hello() {
-        assert_eq!(hex::encode(haval224_5(b"hello")), "aa6551d75e33a9c5cd4141e9a068b1fc7b6d847f85c3ab1629578ed3");
+        assert_eq!(
+            hex::encode(haval224_5(b"hello")),
+            "aa6551d75e33a9c5cd4141e9a068b1fc7b6d847f85c3ab1629578ed3"
+        );
     }
     #[test]
     fn test_haval256_3_hello() {
-        assert_eq!(hex::encode(haval256_3(b"hello")), "26718e4fb05595cb8703a672a8ae91eea071cac5e7426173d4c25a611c4b8022");
+        assert_eq!(
+            hex::encode(haval256_3(b"hello")),
+            "26718e4fb05595cb8703a672a8ae91eea071cac5e7426173d4c25a611c4b8022"
+        );
     }
     #[test]
     fn test_haval256_4_hello() {
-        assert_eq!(hex::encode(haval256_4(b"hello")), "2d39577df3a6a63168826b2a10f07a65a676f5776a0772e0a877e27ec3c4c0ad");
+        assert_eq!(
+            hex::encode(haval256_4(b"hello")),
+            "2d39577df3a6a63168826b2a10f07a65a676f5776a0772e0a877e27ec3c4c0ad"
+        );
     }
     #[test]
     fn test_haval256_5_hello() {
-        assert_eq!(hex::encode(haval256_5(b"hello")), "348298791817d5088a6de6c1b6364756d404a50bd64e645035f8cd4291c482c7");
+        assert_eq!(
+            hex::encode(haval256_5(b"hello")),
+            "348298791817d5088a6de6c1b6364756d404a50bd64e645035f8cd4291c482c7"
+        );
     }
 
     // === Emoji (😀) tests for all 15 variants ===
 
     #[test]
     fn test_haval128_3_emoji() {
-        assert_eq!(hex::encode(haval128_3("😀".as_bytes())), "730c55c19a5e76e0759a8d48230d1a0d");
+        assert_eq!(
+            hex::encode(haval128_3("😀".as_bytes())),
+            "730c55c19a5e76e0759a8d48230d1a0d"
+        );
     }
     #[test]
     fn test_haval128_4_emoji() {
-        assert_eq!(hex::encode(haval128_4("😀".as_bytes())), "4d513ff4f2cc8688d27d32dda9b6c3c9");
+        assert_eq!(
+            hex::encode(haval128_4("😀".as_bytes())),
+            "4d513ff4f2cc8688d27d32dda9b6c3c9"
+        );
     }
     #[test]
     fn test_haval128_5_emoji() {
-        assert_eq!(hex::encode(haval128_5("😀".as_bytes())), "36772b4e5c06cfa5bd02701103276ac6");
+        assert_eq!(
+            hex::encode(haval128_5("😀".as_bytes())),
+            "36772b4e5c06cfa5bd02701103276ac6"
+        );
     }
     #[test]
     fn test_haval160_3_emoji() {
-        assert_eq!(hex::encode(haval160_3("😀".as_bytes())), "e1d0813b699cde4794ea9394c6a1ce1812ba2ef2");
+        assert_eq!(
+            hex::encode(haval160_3("😀".as_bytes())),
+            "e1d0813b699cde4794ea9394c6a1ce1812ba2ef2"
+        );
     }
     #[test]
     fn test_haval160_4_emoji() {
-        assert_eq!(hex::encode(haval160_4("😀".as_bytes())), "d01c8ddaa3d4bb6f7b0f70d6b6707cead73d5938");
+        assert_eq!(
+            hex::encode(haval160_4("😀".as_bytes())),
+            "d01c8ddaa3d4bb6f7b0f70d6b6707cead73d5938"
+        );
     }
     #[test]
     fn test_haval160_5_emoji() {
-        assert_eq!(hex::encode(haval160_5("😀".as_bytes())), "f875cbfc6b064356cff76e17cec063dc7ed8f06f");
+        assert_eq!(
+            hex::encode(haval160_5("😀".as_bytes())),
+            "f875cbfc6b064356cff76e17cec063dc7ed8f06f"
+        );
     }
     #[test]
     fn test_haval192_3_emoji() {
-        assert_eq!(hex::encode(haval192_3("😀".as_bytes())), "3ba432c236bcd3924ce3e9faa9f8a7a803396f32d74df044");
+        assert_eq!(
+            hex::encode(haval192_3("😀".as_bytes())),
+            "3ba432c236bcd3924ce3e9faa9f8a7a803396f32d74df044"
+        );
     }
     #[test]
     fn test_haval192_4_emoji() {
-        assert_eq!(hex::encode(haval192_4("😀".as_bytes())), "bdd69520bc1be0bf59919bb363fbfa1b98188ee9fc399e60");
+        assert_eq!(
+            hex::encode(haval192_4("😀".as_bytes())),
+            "bdd69520bc1be0bf59919bb363fbfa1b98188ee9fc399e60"
+        );
     }
     #[test]
     fn test_haval192_5_emoji() {
-        assert_eq!(hex::encode(haval192_5("😀".as_bytes())), "6d9791cb02f0baaca3276745fc3b21e5fdb4b0c4b6dce8eb");
+        assert_eq!(
+            hex::encode(haval192_5("😀".as_bytes())),
+            "6d9791cb02f0baaca3276745fc3b21e5fdb4b0c4b6dce8eb"
+        );
     }
     #[test]
     fn test_haval224_3_emoji() {
-        assert_eq!(hex::encode(haval224_3("😀".as_bytes())), "57d3fcc74cfe01598c32804c63298edebe1687e4d0764502f40a78e7");
+        assert_eq!(
+            hex::encode(haval224_3("😀".as_bytes())),
+            "57d3fcc74cfe01598c32804c63298edebe1687e4d0764502f40a78e7"
+        );
     }
     #[test]
     fn test_haval224_4_emoji() {
-        assert_eq!(hex::encode(haval224_4("😀".as_bytes())), "942dba6403beeff992928b5286ab21e8ed923ef74fb3230540fe2ad2");
+        assert_eq!(
+            hex::encode(haval224_4("😀".as_bytes())),
+            "942dba6403beeff992928b5286ab21e8ed923ef74fb3230540fe2ad2"
+        );
     }
     #[test]
     fn test_haval224_5_emoji() {
-        assert_eq!(hex::encode(haval224_5("😀".as_bytes())), "c0b4ea1254e99f885fc116fbfe27df900ba34b7f7222c44e0aa0ec9f");
+        assert_eq!(
+            hex::encode(haval224_5("😀".as_bytes())),
+            "c0b4ea1254e99f885fc116fbfe27df900ba34b7f7222c44e0aa0ec9f"
+        );
     }
     #[test]
     fn test_haval256_3_emoji() {
-        assert_eq!(hex::encode(haval256_3("😀".as_bytes())), "8b9e8c223e3970cf98895a5af35d6e11ee466131d1ebfe07d5982e5acd841c5b");
+        assert_eq!(
+            hex::encode(haval256_3("😀".as_bytes())),
+            "8b9e8c223e3970cf98895a5af35d6e11ee466131d1ebfe07d5982e5acd841c5b"
+        );
     }
     #[test]
     fn test_haval256_4_emoji() {
-        assert_eq!(hex::encode(haval256_4("😀".as_bytes())), "bf23332ae5136857e99dee0e145bfad12637eab08bb6ec7611d4ee764391b4ba");
+        assert_eq!(
+            hex::encode(haval256_4("😀".as_bytes())),
+            "bf23332ae5136857e99dee0e145bfad12637eab08bb6ec7611d4ee764391b4ba"
+        );
     }
     #[test]
     fn test_haval256_5_emoji() {
-        assert_eq!(hex::encode(haval256_5("😀".as_bytes())), "8e3f708432178aee9e3efef0314703bd951c8e2d4a712acb68fe56f5dee0753d");
+        assert_eq!(
+            hex::encode(haval256_5("😀".as_bytes())),
+            "8e3f708432178aee9e3efef0314703bd951c8e2d4a712acb68fe56f5dee0753d"
+        );
     }
 
     // === HAVAL-128 tests ===
@@ -813,28 +944,32 @@ mod tests {
     #[test]
     fn test_haval224_3_empty() {
         let result = haval224_3(b"");
-        let expected = hex::decode("c5aae9d47bffcaaf84a8c6e7ccacd60a0dd1932be7b1a192b9214b6d").unwrap();
+        let expected =
+            hex::decode("c5aae9d47bffcaaf84a8c6e7ccacd60a0dd1932be7b1a192b9214b6d").unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval224_3_test() {
         let result = haval224_3(b"test");
-        let expected = hex::decode("f5b30a47580d8bfa256d6ed7604ffd2bb787abb22b53ad9f693e8d31").unwrap();
+        let expected =
+            hex::decode("f5b30a47580d8bfa256d6ed7604ffd2bb787abb22b53ad9f693e8d31").unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval224_4_test() {
         let result = haval224_4(b"test");
-        let expected = hex::decode("deea192a84b5e29ab958202b22a0b604c1df1298ee7d32ee5d7e2954").unwrap();
+        let expected =
+            hex::decode("deea192a84b5e29ab958202b22a0b604c1df1298ee7d32ee5d7e2954").unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval224_5_test() {
         let result = haval224_5(b"test");
-        let expected = hex::decode("9666797abc57d096c2a9922e350390437f9c2e378ce2e43e0d816d90").unwrap();
+        let expected =
+            hex::decode("9666797abc57d096c2a9922e350390437f9c2e378ce2e43e0d816d90").unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -842,42 +977,54 @@ mod tests {
     #[test]
     fn test_haval256_3_empty() {
         let result = haval256_3(b"");
-        let expected = hex::decode("4f6938531f0bc8991f62da7bbd6f7de3fad44562b8c6f4ebf146d5b4e46f7c17").unwrap();
+        let expected =
+            hex::decode("4f6938531f0bc8991f62da7bbd6f7de3fad44562b8c6f4ebf146d5b4e46f7c17")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_test() {
         let result = haval256_3(b"test");
-        let expected = hex::decode("593c9aed973bb51a3c852fb4e051d7c26686b9468b4e405350cb6805dc1b99e6").unwrap();
+        let expected =
+            hex::decode("593c9aed973bb51a3c852fb4e051d7c26686b9468b4e405350cb6805dc1b99e6")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_4_empty() {
         let result = haval256_4(b"");
-        let expected = hex::decode("c92b2e23091e80e375dadce26982482d197b1a2521be82da819f8ca2c579b99b").unwrap();
+        let expected =
+            hex::decode("c92b2e23091e80e375dadce26982482d197b1a2521be82da819f8ca2c579b99b")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_4_test() {
         let result = haval256_4(b"test");
-        let expected = hex::decode("435ded7266cba07f389d6e74c954b184e1ddacc8a7b8dc022db3ca4450a738cd").unwrap();
+        let expected =
+            hex::decode("435ded7266cba07f389d6e74c954b184e1ddacc8a7b8dc022db3ca4450a738cd")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_empty() {
         let result = haval256_5(b"");
-        let expected = hex::decode("be417bb4dd5cfb76c7126f4f8eeb1553a449039307b1a3cd451dbfdc0fbbe330").unwrap();
+        let expected =
+            hex::decode("be417bb4dd5cfb76c7126f4f8eeb1553a449039307b1a3cd451dbfdc0fbbe330")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_test() {
         let result = haval256_5(b"test");
-        let expected = hex::decode("a4b59d68e0111000856baca9e6573a2adc2b56b6b4d87f7cf31de24a77b93768").unwrap();
+        let expected =
+            hex::decode("a4b59d68e0111000856baca9e6573a2adc2b56b6b4d87f7cf31de24a77b93768")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -886,14 +1033,18 @@ mod tests {
     fn test_haval256_3_1000_bytes() {
         let data = vec![b'a'; 1000];
         let result = haval256_3(&data);
-        let expected = hex::decode("283a1cd61df7df0890b57228064ea8539955fcbffc4c8b7697ce8ce7b641c8af").unwrap();
+        let expected =
+            hex::decode("283a1cd61df7df0890b57228064ea8539955fcbffc4c8b7697ce8ce7b641c8af")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_fox() {
         let result = haval256_3(b"The quick brown fox jumps over the lazy dog");
-        let expected = hex::decode("9446028f42b3768a41bd873ca69b0c006341d986613567f39eb61f96ca683300").unwrap();
+        let expected =
+            hex::decode("9446028f42b3768a41bd873ca69b0c006341d986613567f39eb61f96ca683300")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -903,7 +1054,9 @@ mod tests {
         let data = vec![b'a'; 1000];
         let result = haval256_4(&data);
         // Verified with PHP: hash("haval256,4", str_repeat("a", 1000))
-        let expected = hex::decode("8a4ae896c0f2bcdb5d22eab2d3840652c831dabc1280290a62555966a2c178a4").unwrap();
+        let expected =
+            hex::decode("8a4ae896c0f2bcdb5d22eab2d3840652c831dabc1280290a62555966a2c178a4")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -913,7 +1066,9 @@ mod tests {
         let data = vec![b'a'; 1000];
         let result = haval256_5(&data);
         // Verified with PHP: hash("haval256,5", str_repeat("a", 1000))
-        let expected = hex::decode("895160426130860e829459269691913009542a6ac51752f154847a9359618f44").unwrap();
+        let expected =
+            hex::decode("895160426130860e829459269691913009542a6ac51752f154847a9359618f44")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -923,63 +1078,81 @@ mod tests {
     #[test]
     fn test_haval256_3_127_bytes() {
         let result = haval256_3(&vec![b'a'; 127]);
-        let expected = hex::decode("14b6e3418a669865cd25c413c8fbdf680e3420b563a468845271674405f52abd").unwrap();
+        let expected =
+            hex::decode("14b6e3418a669865cd25c413c8fbdf680e3420b563a468845271674405f52abd")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_128_bytes() {
         let result = haval256_3(&vec![b'a'; 128]);
-        let expected = hex::decode("13faa4d94db48282d58e05b69be23ec24d1bf5c724dfdd7f2a1c17763f3d355f").unwrap();
+        let expected =
+            hex::decode("13faa4d94db48282d58e05b69be23ec24d1bf5c724dfdd7f2a1c17763f3d355f")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_129_bytes() {
         let result = haval256_3(&vec![b'a'; 129]);
-        let expected = hex::decode("18229631aea1373425523a5e9a11aa8545c98376ebd07525f5f33aaed88bce50").unwrap();
+        let expected =
+            hex::decode("18229631aea1373425523a5e9a11aa8545c98376ebd07525f5f33aaed88bce50")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_4_127_bytes() {
         let result = haval256_4(&vec![b'a'; 127]);
-        let expected = hex::decode("6380e8e8e2f3907f314fcddb51f48e3a55b0130a6bba01eec3c2b90e195e554e").unwrap();
+        let expected =
+            hex::decode("6380e8e8e2f3907f314fcddb51f48e3a55b0130a6bba01eec3c2b90e195e554e")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_4_128_bytes() {
         let result = haval256_4(&vec![b'a'; 128]);
-        let expected = hex::decode("f30bc5d2ae4d446523b50f780111b79eb5caeceb0a4e6981638e539709776b99").unwrap();
+        let expected =
+            hex::decode("f30bc5d2ae4d446523b50f780111b79eb5caeceb0a4e6981638e539709776b99")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_4_129_bytes() {
         let result = haval256_4(&vec![b'a'; 129]);
-        let expected = hex::decode("2acd67570c738a5a5f19eaaf2e9dd0202dfcd0e8e0129b742f1deda7a929eb0e").unwrap();
+        let expected =
+            hex::decode("2acd67570c738a5a5f19eaaf2e9dd0202dfcd0e8e0129b742f1deda7a929eb0e")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_127_bytes() {
         let result = haval256_5(&vec![b'a'; 127]);
-        let expected = hex::decode("f7eabeec467c8b56af40f90e799ea878d8ea7eff260d49982209364ad0e0c39d").unwrap();
+        let expected =
+            hex::decode("f7eabeec467c8b56af40f90e799ea878d8ea7eff260d49982209364ad0e0c39d")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_128_bytes() {
         let result = haval256_5(&vec![b'a'; 128]);
-        let expected = hex::decode("93390552a2d23df530a5918c95d095e3914cf476cd1d95bede099c7674b31efe").unwrap();
+        let expected =
+            hex::decode("93390552a2d23df530a5918c95d095e3914cf476cd1d95bede099c7674b31efe")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_129_bytes() {
         let result = haval256_5(&vec![b'a'; 129]);
-        let expected = hex::decode("a084bcc569ed32e30bb0c79e7b4f82be98c3934d2333ea7f6757c726382d6688").unwrap();
+        let expected =
+            hex::decode("a084bcc569ed32e30bb0c79e7b4f82be98c3934d2333ea7f6757c726382d6688")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -989,42 +1162,54 @@ mod tests {
     #[test]
     fn test_haval256_3_117_bytes() {
         let result = haval256_3(&vec![b'a'; 117]);
-        let expected = hex::decode("3973ff8c2014d772f2999001c0a264543d1e1e8a968a5e32f81e37650583f639").unwrap();
+        let expected =
+            hex::decode("3973ff8c2014d772f2999001c0a264543d1e1e8a968a5e32f81e37650583f639")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_118_bytes() {
         let result = haval256_3(&vec![b'a'; 118]);
-        let expected = hex::decode("712f49ede266ce71c1421c5c90b898d20d96ee712b2c139fc7ff1830919f44f9").unwrap();
+        let expected =
+            hex::decode("712f49ede266ce71c1421c5c90b898d20d96ee712b2c139fc7ff1830919f44f9")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_119_bytes() {
         let result = haval256_3(&vec![b'a'; 119]);
-        let expected = hex::decode("0455661f2f02a015d9cf3c411af0509080124a7e628b84ec33e68432e88d7cd2").unwrap();
+        let expected =
+            hex::decode("0455661f2f02a015d9cf3c411af0509080124a7e628b84ec33e68432e88d7cd2")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_117_bytes() {
         let result = haval256_5(&vec![b'a'; 117]);
-        let expected = hex::decode("5ccc1fcc4aca9ab3a014732dbafee7ed7c0cf1028b4bbaffe92a9d78e634ee02").unwrap();
+        let expected =
+            hex::decode("5ccc1fcc4aca9ab3a014732dbafee7ed7c0cf1028b4bbaffe92a9d78e634ee02")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_118_bytes() {
         let result = haval256_5(&vec![b'a'; 118]);
-        let expected = hex::decode("34e1b82fdea5bf0d5eec513d8bc463d2eeab36a2af5f5183cc98b564e51431b0").unwrap();
+        let expected =
+            hex::decode("34e1b82fdea5bf0d5eec513d8bc463d2eeab36a2af5f5183cc98b564e51431b0")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_119_bytes() {
         let result = haval256_5(&vec![b'a'; 119]);
-        let expected = hex::decode("e317fa1b993386e8e4c38f6a9a3bb4ae1f903d00df13d16a86f13fbb68a11a28").unwrap();
+        let expected =
+            hex::decode("e317fa1b993386e8e4c38f6a9a3bb4ae1f903d00df13d16a86f13fbb68a11a28")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -1048,7 +1233,9 @@ mod tests {
     #[test]
     fn test_haval256_5_128_0xff() {
         let result = haval256_5(&vec![0xFFu8; 128]);
-        let expected = hex::decode("02eacd6a9862004632406b6724655b1d6dc98b4ce07b2c8bff129dcba98e170a").unwrap();
+        let expected =
+            hex::decode("02eacd6a9862004632406b6724655b1d6dc98b4ce07b2c8bff129dcba98e170a")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -1062,7 +1249,8 @@ mod tests {
     #[test]
     fn test_haval224_5_64_0xff() {
         let result = haval224_5(&vec![0xFFu8; 64]);
-        let expected = hex::decode("b641c9d8b48a577eda510b52031b3507085a2837b39fd4c32dc8c43d").unwrap();
+        let expected =
+            hex::decode("b641c9d8b48a577eda510b52031b3507085a2837b39fd4c32dc8c43d").unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -1071,28 +1259,36 @@ mod tests {
     #[test]
     fn test_haval256_3_single_0x00() {
         let result = haval256_3(&[0x00]);
-        let expected = hex::decode("3a9ac785b9f8a38adf82cb7342a00ae29e259e5f4c40f567f9083c5af1000100").unwrap();
+        let expected =
+            hex::decode("3a9ac785b9f8a38adf82cb7342a00ae29e259e5f4c40f567f9083c5af1000100")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_single_0x80() {
         let result = haval256_3(&[0x80]);
-        let expected = hex::decode("5fc7d7c3067b4fab91e1b9c79875bdafe961d68d784224ad26d5fd1e9bf18ba4").unwrap();
+        let expected =
+            hex::decode("5fc7d7c3067b4fab91e1b9c79875bdafe961d68d784224ad26d5fd1e9bf18ba4")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_single_0xff() {
         let result = haval256_3(&[0xFF]);
-        let expected = hex::decode("f535a93dda842a6f96b6350d3fe8f31c6b9efbc2ffe20bd7ea92f34bd3e7da7d").unwrap();
+        let expected =
+            hex::decode("f535a93dda842a6f96b6350d3fe8f31c6b9efbc2ffe20bd7ea92f34bd3e7da7d")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_single_0x80() {
         let result = haval256_5(&[0x80]);
-        let expected = hex::decode("09a52378aee3d34064d6350d8e607a7f63fd48e86ab5f5b4a874d96cbac060c1").unwrap();
+        let expected =
+            hex::decode("09a52378aee3d34064d6350d8e607a7f63fd48e86ab5f5b4a874d96cbac060c1")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -1101,14 +1297,18 @@ mod tests {
     #[test]
     fn test_haval256_3_alternating_0x55() {
         let result = haval256_3(&vec![0x55u8; 64]);
-        let expected = hex::decode("169251ffd88646e661f5ce063a2c4d3e6602c62133b78ccdc0074a6a263c3c20").unwrap();
+        let expected =
+            hex::decode("169251ffd88646e661f5ce063a2c4d3e6602c62133b78ccdc0074a6a263c3c20")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_alternating_0xaa() {
         let result = haval256_3(&vec![0xAAu8; 64]);
-        let expected = hex::decode("d7363eff6e7c5e7196fcfa3e75fd06f523703be949d77aa4cdc46949b517b341").unwrap();
+        let expected =
+            hex::decode("d7363eff6e7c5e7196fcfa3e75fd06f523703be949d77aa4cdc46949b517b341")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -1139,14 +1339,17 @@ mod tests {
     #[test]
     fn test_haval224_3_128_0xff() {
         let result = haval224_3(&vec![0xFFu8; 128]);
-        let expected = hex::decode("886ceeadcebf60b70876186e7ebd29fc5e08572179f039e6119c8bfd").unwrap();
+        let expected =
+            hex::decode("886ceeadcebf60b70876186e7ebd29fc5e08572179f039e6119c8bfd").unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_3_128_0xff() {
         let result = haval256_3(&vec![0xFFu8; 128]);
-        let expected = hex::decode("412b93ac63c5cbcabb73c87b436d4e0cbf5554c513230411a75c063a5bf7e94e").unwrap();
+        let expected =
+            hex::decode("412b93ac63c5cbcabb73c87b436d4e0cbf5554c513230411a75c063a5bf7e94e")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
@@ -1157,7 +1360,7 @@ mod tests {
 
     #[test]
     fn test_haval256_3_sha256_counter_100003() {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut data = Vec::with_capacity(100003);
         let mut counter: u64 = 0;
         while data.len() < 100003 {
@@ -1168,13 +1371,15 @@ mod tests {
         }
         data.truncate(100003);
         let result = haval256_3(&data);
-        let expected = hex::decode("9c7b45688f2a00549dd06139d8dbaa7ae61c8b64dc7f04f33a29c10956a27e01").unwrap();
+        let expected =
+            hex::decode("9c7b45688f2a00549dd06139d8dbaa7ae61c8b64dc7f04f33a29c10956a27e01")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_4_sha256_counter_100003() {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut data = Vec::with_capacity(100003);
         let mut counter: u64 = 0;
         while data.len() < 100003 {
@@ -1185,13 +1390,15 @@ mod tests {
         }
         data.truncate(100003);
         let result = haval256_4(&data);
-        let expected = hex::decode("8abc17b3d52ec83762392d3766715be1583fb6e32022f1b9a6d20c08d3c7371b").unwrap();
+        let expected =
+            hex::decode("8abc17b3d52ec83762392d3766715be1583fb6e32022f1b9a6d20c08d3c7371b")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 
     #[test]
     fn test_haval256_5_sha256_counter_100003() {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut data = Vec::with_capacity(100003);
         let mut counter: u64 = 0;
         while data.len() < 100003 {
@@ -1202,7 +1409,9 @@ mod tests {
         }
         data.truncate(100003);
         let result = haval256_5(&data);
-        let expected = hex::decode("bc091e4b3ec6700bb6ec1cb9f80869bd9344a9ba4c946f9a4eb2716c722b60a0").unwrap();
+        let expected =
+            hex::decode("bc091e4b3ec6700bb6ec1cb9f80869bd9344a9ba4c946f9a4eb2716c722b60a0")
+                .unwrap();
         assert_eq!(&result[..], &expected[..]);
     }
 }

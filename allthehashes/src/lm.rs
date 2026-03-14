@@ -1,6 +1,6 @@
+use crate::HashAlgorithm;
 use des::cipher::{BlockEncrypt, KeyInit};
 use des::Des;
-use crate::HashAlgorithm;
 
 /// LAN Manager hash.
 ///

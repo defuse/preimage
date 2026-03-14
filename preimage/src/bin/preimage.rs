@@ -5,7 +5,9 @@ use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use preimage::{get_algorithm, HashAlgorithm, HashResult, IndexFile, PreimageOracle, ALGORITHM_NAMES};
+use preimage::{
+    get_algorithm, HashAlgorithm, HashResult, IndexFile, PreimageOracle, ALGORITHM_NAMES,
+};
 
 #[derive(Parser)]
 #[command(
@@ -114,15 +116,13 @@ EXAMPLE:
 }
 
 #[derive(clap::Args)]
-#[command(
-    after_help = "\
+#[command(after_help = "\
 EXAMPLES:
   Single-table lookup:
     preimage lookup -a md5 -i index.idx -d words.txt 5d41402abc4b2a76b9719d911017c592
 
   Multi-table lookup:
-    preimage lookup --config tables.toml --early-exit 5d41402abc4b2a76b9719d911017c592"
-)]
+    preimage lookup --config tables.toml --early-exit 5d41402abc4b2a76b9719d911017c592")]
 struct LookupArgs {
     /// Hash algorithm (for single-table lookup)
     #[arg(short, long)]
@@ -234,7 +234,9 @@ fn cmd_check(index_path: &PathBuf) -> Result<()> {
     let pb = ProgressBar::new(0);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} entries")
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} entries",
+            )
             .expect("valid template")
             .progress_chars("#>-"),
     );
@@ -332,23 +334,35 @@ fn lookup_with_config(config_path: &PathBuf, hashes: &[String], early_exit: bool
             HashResult::InvalidFormat { input } => {
                 println!("{}: INVALID FORMAT", input);
             }
-            HashResult::Lookup { queried_hash, matches } if matches.is_empty() => {
+            HashResult::Lookup {
+                queried_hash,
+                matches,
+            } if matches.is_empty() => {
                 println!("{}: NOT FOUND", queried_hash);
             }
-            HashResult::Lookup { queried_hash, matches } => {
+            HashResult::Lookup {
+                queried_hash,
+                matches,
+            } => {
                 for m in matches {
                     let lm = &m.lookup_match;
                     let plaintext = lm.plaintext_lossy();
                     if lm.is_full() {
                         println!(
                             "{}: {} [{}] ({})",
-                            queried_hash, plaintext, m.table_label, lm.algorithm().name()
+                            queried_hash,
+                            plaintext,
+                            m.table_label,
+                            lm.algorithm().name()
                         );
                     } else {
                         println!(
                             "{}: {} [{}] ({}, partial, full hash: {})",
-                            queried_hash, plaintext, m.table_label,
-                            lm.algorithm().name(), hex::encode(lm.recomputed_hash())
+                            queried_hash,
+                            plaintext,
+                            m.table_label,
+                            lm.algorithm().name(),
+                            hex::encode(lm.recomputed_hash())
                         );
                     }
                 }

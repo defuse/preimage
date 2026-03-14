@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Result};
 use memmap2::Mmap;
 
-use crate::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
+use super::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
 use crate::HashAlgorithm;
 
 /// A match from looking up one hash against one index.
@@ -43,8 +43,12 @@ impl LookupMatch {
     /// Get the recomputed full hash bytes.
     pub fn recomputed_hash(&self) -> &[u8] {
         match self {
-            LookupMatch::Full { recomputed_hash, .. } => recomputed_hash,
-            LookupMatch::Partial { recomputed_hash, .. } => recomputed_hash,
+            LookupMatch::Full {
+                recomputed_hash, ..
+            } => recomputed_hash,
+            LookupMatch::Partial {
+                recomputed_hash, ..
+            } => recomputed_hash,
         }
     }
 
@@ -257,8 +261,8 @@ fn read_word_at(file: &mut File, position: u64) -> Result<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::index::builder::IndexBuilder;
-    use crate::{Md5, MD5};
     use crate::index::sorter::IndexSorter;
+    use crate::{Md5, MD5};
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {
@@ -310,8 +314,7 @@ mod tests {
     #[test]
     fn test_lookup_from_test_words() {
         let index = build_and_sort(&Md5, &test_words_path());
-        let table =
-            LookupTable::open(MD5, index.path(), &test_words_path()).expect("open");
+        let table = LookupTable::open(MD5, index.path(), &test_words_path()).expect("open");
 
         // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
         let matches = table

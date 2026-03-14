@@ -2,8 +2,8 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::HashAlgorithm;
 use crate::index::lookup::{parse_hash_hex, LookupMatch, LookupTable};
+use crate::HashAlgorithm;
 
 /// A match from the oracle, wrapping a LookupMatch with table context.
 pub struct OracleMatch<'a> {
@@ -21,9 +21,7 @@ pub enum HashResult<'a> {
         matches: Vec<OracleMatch<'a>>,
     },
     /// The input was not a valid hash format (non-hex, odd-length, or too short).
-    InvalidFormat {
-        input: String,
-    },
+    InvalidFormat { input: String },
 }
 
 /// Multi-table hash lookup oracle.
@@ -138,8 +136,8 @@ fn has_full_match(result: &HashResult<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::index::builder::IndexBuilder;
-    use crate::{MD5, SHA1, Md5, Sha1};
     use crate::index::sorter::IndexSorter;
+    use crate::{Md5, Sha1, MD5, SHA1};
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {
@@ -230,7 +228,11 @@ mod tests {
             .iter()
             .filter(|m| matches!(&m.lookup_match, LookupMatch::Full { .. }))
             .collect();
-        assert_eq!(full.len(), 1, "early_exit should stop after first full match");
+        assert_eq!(
+            full.len(),
+            1,
+            "early_exit should stop after first full match"
+        );
         assert_eq!(full[0].table_label, "md5-first");
     }
 
@@ -290,9 +292,9 @@ mod tests {
 
         let results = oracle.crack(
             &[
-                "xyz",                                // non-hex
-                "abc",                                // too short + odd
-                "1f3870be274f6c49b3e31a0c6728957f",   // valid MD5("apple")
+                "xyz",                              // non-hex
+                "abc",                              // too short + odd
+                "1f3870be274f6c49b3e31a0c6728957f", // valid MD5("apple")
             ],
             false,
         );
@@ -321,10 +323,10 @@ mod tests {
 
         let results = oracle.crack(
             &[
-                "1f3870be274f6c49b3e31a0c6728957f",   // valid: apple
-                "not_hex_at_all!!",                    // invalid
-                "ffffffffffffffffffffffffffffffff",   // valid: not found
-                "abcde",                              // invalid: odd + short
+                "1f3870be274f6c49b3e31a0c6728957f", // valid: apple
+                "not_hex_at_all!!",                 // invalid
+                "ffffffffffffffffffffffffffffffff", // valid: not found
+                "abcde",                            // invalid: odd + short
             ],
             false,
         );
@@ -345,8 +347,6 @@ mod tests {
         assert!(matches.is_empty());
 
         // Fourth: invalid
-        assert!(
-            matches!(&results[3], HashResult::InvalidFormat { input } if input == "abcde"),
-        );
+        assert!(matches!(&results[3], HashResult::InvalidFormat { input } if input == "abcde"),);
     }
 }

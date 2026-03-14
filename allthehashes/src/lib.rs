@@ -3,27 +3,24 @@
 //! This crate provides a common `HashAlgorithm` trait and implementations
 //! for cryptographic hashes, legacy hashes, and non-cryptographic checksums.
 
-mod standard;
-mod ntlm;
-mod lm;
-mod compound;
-mod snefru;
-mod tiger;
-mod haval;
 mod checksums;
+mod compound;
+mod haval;
+mod lm;
+mod ntlm;
+mod snefru;
+mod standard;
+mod tiger;
 
-pub use standard::{
-    Md2, Md4, Md5, Sha1, Sha224, Sha256, Sha384, Sha512,
-    Sha512_224, Sha512_256,
-    Sha3_224, Sha3_256, Sha3_384, Sha3_512,
-    Whirlpool,
-    Ripemd128, Ripemd160, Ripemd256, Ripemd320,
-    Gost94Test, Gost94CryptoPro,
-};
-pub use ntlm::Ntlm;
-pub use lm::Lm;
-pub use compound::{Md5Md5, MySql41, QubesV31};
 pub use checksums::{Adler32, Crc32, Crc32b, Crc32c, Fnv132, Fnv164, Fnv1a32, Fnv1a64, Joaat};
+pub use compound::{Md5Md5, MySql41, QubesV31};
+pub use lm::Lm;
+pub use ntlm::Ntlm;
+pub use standard::{
+    Gost94CryptoPro, Gost94Test, Md2, Md4, Md5, Ripemd128, Ripemd160, Ripemd256, Ripemd320, Sha1,
+    Sha224, Sha256, Sha384, Sha3_224, Sha3_256, Sha3_384, Sha3_512, Sha512, Sha512_224, Sha512_256,
+    Whirlpool,
+};
 
 // Wrapper structs for custom hash implementations
 macro_rules! custom_hash {

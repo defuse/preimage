@@ -1,10 +1,10 @@
-pub mod entry;
 mod index;
 mod oracle;
 
 // Re-export everything from allthehashes
 pub use allthehashes::*;
 
+pub use index::entry;
+pub use index::lookup::{LookupMatch, LookupTable};
 pub use index::IndexFile;
-pub use index::lookup::{LookupTable, LookupMatch};
-pub use oracle::{PreimageOracle, OracleMatch, HashResult};
+pub use oracle::{HashResult, OracleMatch, PreimageOracle};
