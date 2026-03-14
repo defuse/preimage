@@ -68,7 +68,10 @@ impl PreimageOracle {
     /// is skipped for remaining tables.
     ///
     /// Returns results in the same order as the input hashes.
-    pub fn crack<'a>(&'a self, hashes: &[&str], early_exit: bool) -> Vec<HashResult<'a>> {
+    ///
+    /// # Errors
+    /// Returns an error if any table lookup fails (I/O error, corrupted index, etc.).
+    pub fn crack<'a>(&'a self, hashes: &[&str], early_exit: bool) -> Result<Vec<HashResult<'a>>> {
         // Validate all hashes upfront. Invalid ones get InvalidFormat immediately.
         let mut results: Vec<HashResult<'a>> = hashes
             .iter()
@@ -98,10 +101,7 @@ impl PreimageOracle {
                     continue;
                 }
 
-                let lookup_matches = match table.lookup.lookup(hash_hex) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                };
+                let lookup_matches = table.lookup.lookup(hash_hex)?;
 
                 for lm in lookup_matches {
                     matches.push(OracleMatch {
@@ -112,7 +112,7 @@ impl PreimageOracle {
             }
         }
 
-        results
+        Ok(results)
     }
 }
 
@@ -166,7 +166,7 @@ mod tests {
             .expect("register");
 
         // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
-        let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], false);
+        let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], false).expect("crack");
         assert_eq!(results.len(), 1);
         let HashResult::Lookup { matches, .. } = &results[0] else {
             panic!("expected Lookup variant");
@@ -190,7 +190,7 @@ mod tests {
             .expect("register sha1");
 
         // MD5("apple")
-        let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], false);
+        let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], false).expect("crack");
         assert_eq!(results.len(), 1);
         let HashResult::Lookup { matches, .. } = &results[0] else {
             panic!("expected Lookup variant");
@@ -219,7 +219,7 @@ mod tests {
             .expect("register");
 
         // With early_exit, should only find in first table
-        let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], true);
+        let results = oracle.crack(&["1f3870be274f6c49b3e31a0c6728957f"], true).expect("crack");
         assert_eq!(results.len(), 1);
         let HashResult::Lookup { matches, .. } = &results[0] else {
             panic!("expected Lookup variant");
@@ -246,7 +246,7 @@ mod tests {
             .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
-        let results = oracle.crack(&["ffffffffffffffffffffffffffffffff"], false);
+        let results = oracle.crack(&["ffffffffffffffffffffffffffffffff"], false).expect("crack");
         assert_eq!(results.len(), 1);
         let HashResult::Lookup { matches, .. } = &results[0] else {
             panic!("expected Lookup variant");
@@ -264,14 +264,16 @@ mod tests {
             .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
-        let results = oracle.crack(
-            &[
-                "1f3870be274f6c49b3e31a0c6728957f", // apple
-                "ffffffffffffffffffffffffffffffff", // not found
-                "5d41402abc4b2a76b9719d911017c592", // hello (not in words.txt)
-            ],
-            false,
-        );
+        let results = oracle
+            .crack(
+                &[
+                    "1f3870be274f6c49b3e31a0c6728957f", // apple
+                    "ffffffffffffffffffffffffffffffff", // not found
+                    "5d41402abc4b2a76b9719d911017c592", // hello (not in words.txt)
+                ],
+                false,
+            )
+            .expect("crack");
         assert_eq!(results.len(), 3);
         assert!(has_full_match(&results[0]), "apple should be found");
         let HashResult::Lookup { matches, .. } = &results[1] else {
@@ -290,14 +292,16 @@ mod tests {
             .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
-        let results = oracle.crack(
-            &[
-                "xyz",                              // non-hex
-                "abc",                              // too short + odd
-                "1f3870be274f6c49b3e31a0c6728957f", // valid MD5("apple")
-            ],
-            false,
-        );
+        let results = oracle
+            .crack(
+                &[
+                    "xyz",                              // non-hex
+                    "abc",                              // too short + odd
+                    "1f3870be274f6c49b3e31a0c6728957f", // valid MD5("apple")
+                ],
+                false,
+            )
+            .expect("crack");
         assert_eq!(results.len(), 3);
 
         assert!(
@@ -321,15 +325,17 @@ mod tests {
             .register("md5", MD5, idx.path(), &words)
             .expect("register");
 
-        let results = oracle.crack(
-            &[
-                "1f3870be274f6c49b3e31a0c6728957f", // valid: apple
-                "not_hex_at_all!!",                 // invalid
-                "ffffffffffffffffffffffffffffffff", // valid: not found
-                "abcde",                            // invalid: odd + short
-            ],
-            false,
-        );
+        let results = oracle
+            .crack(
+                &[
+                    "1f3870be274f6c49b3e31a0c6728957f", // valid: apple
+                    "not_hex_at_all!!",                 // invalid
+                    "ffffffffffffffffffffffffffffffff", // valid: not found
+                    "abcde",                            // invalid: odd + short
+                ],
+                false,
+            )
+            .expect("crack");
         assert_eq!(results.len(), 4);
 
         // First: valid, found

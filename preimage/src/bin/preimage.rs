@@ -327,7 +327,7 @@ fn lookup_with_config(config_path: &PathBuf, hashes: &[String], early_exit: bool
     }
 
     let hash_refs: Vec<&str> = hashes.iter().map(|s| s.as_str()).collect();
-    let results = oracle.crack(&hash_refs, early_exit);
+    let results = oracle.crack(&hash_refs, early_exit)?;
 
     for result in &results {
         match result {

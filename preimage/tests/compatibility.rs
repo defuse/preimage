@@ -371,7 +371,7 @@ fn test_oracle_multi_algorithm() {
     let md5_hash = hex::encode(Md5.hash(b"banana").expect("hash"));
     let sha1_hash = hex::encode(Sha1.hash(b"banana").expect("hash"));
 
-    let results = oracle.crack(&[&md5_hash, &sha1_hash], false);
+    let results = oracle.crack(&[&md5_hash, &sha1_hash], false).expect("crack");
     assert_eq!(results.len(), 2);
 
     let HashResult::Lookup {
