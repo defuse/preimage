@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 pub(crate) mod builder;
 pub(crate) mod checker;
 pub mod entry;
+pub(crate) mod header;
 pub mod lookup;
 pub(crate) mod sorter;
 
