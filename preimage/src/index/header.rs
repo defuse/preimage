@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use anyhow::{bail, Result};
@@ -14,6 +14,11 @@ pub(crate) const HASH_NAME_LEN: usize = 128;
 pub(crate) const RESERVED_LEN: usize = 88;
 pub(crate) const SUPPORTED_HASH_PREFIX_BITS: u32 = 64;
 pub(crate) const SUPPORTED_DICTIONARY_ADDRESS_BITS: u32 = 48;
+const HASH_NAME_OFFSET: usize = 24;
+const HASH_PREFIX_BITS_OFFSET: usize = 152;
+const DICTIONARY_ADDRESS_BITS_OFFSET: usize = 156;
+const ENTRY_COUNT_OFFSET: usize = 160;
+const RESERVED_OFFSET: usize = 168;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum IndexState {
@@ -81,11 +86,14 @@ impl IndexHeaderV1 {
             hash_name.len(),
             HASH_NAME_LEN
         );
-        bytes[24..24 + hash_name.len()].copy_from_slice(hash_name);
+        bytes[HASH_NAME_OFFSET..HASH_NAME_OFFSET + hash_name.len()].copy_from_slice(hash_name);
 
-        bytes[152..156].copy_from_slice(&self.hash_prefix_bits.to_le_bytes());
-        bytes[156..160].copy_from_slice(&self.dictionary_address_bits.to_le_bytes());
-        bytes[160..168].copy_from_slice(&self.entry_count.to_le_bytes());
+        bytes[HASH_PREFIX_BITS_OFFSET..HASH_PREFIX_BITS_OFFSET + 4]
+            .copy_from_slice(&self.hash_prefix_bits.to_le_bytes());
+        bytes[DICTIONARY_ADDRESS_BITS_OFFSET..DICTIONARY_ADDRESS_BITS_OFFSET + 4]
+            .copy_from_slice(&self.dictionary_address_bits.to_le_bytes());
+        bytes[ENTRY_COUNT_OFFSET..ENTRY_COUNT_OFFSET + 8]
+            .copy_from_slice(&self.entry_count.to_le_bytes());
         bytes
     }
 
@@ -102,28 +110,42 @@ impl IndexHeaderV1 {
         let state_raw = u32::from_le_bytes(bytes[20..24].try_into().expect("slice length"));
         let state = IndexState::from_u32(state_raw)?;
 
-        let hash_name = decode_hash_name(bytes[24..152].try_into().expect("slice length"))?;
+        let hash_name = decode_hash_name(
+            bytes[HASH_NAME_OFFSET..HASH_NAME_OFFSET + HASH_NAME_LEN]
+                .try_into()
+                .expect("slice length"),
+        )?;
         if get_algorithm(&hash_name).is_none() {
             bail!("unsupported hash algorithm in index header: {hash_name}");
         }
 
-        let hash_prefix_bits =
-            u32::from_le_bytes(bytes[152..156].try_into().expect("slice length"));
+        let hash_prefix_bits = u32::from_le_bytes(
+            bytes[HASH_PREFIX_BITS_OFFSET..HASH_PREFIX_BITS_OFFSET + 4]
+                .try_into()
+                .expect("slice length"),
+        );
         if hash_prefix_bits != SUPPORTED_HASH_PREFIX_BITS {
             bail!("unsupported hash prefix width in index header: {hash_prefix_bits}");
         }
 
-        let dictionary_address_bits =
-            u32::from_le_bytes(bytes[156..160].try_into().expect("slice length"));
+        let dictionary_address_bits = u32::from_le_bytes(
+            bytes[DICTIONARY_ADDRESS_BITS_OFFSET..DICTIONARY_ADDRESS_BITS_OFFSET + 4]
+                .try_into()
+                .expect("slice length"),
+        );
         if dictionary_address_bits != SUPPORTED_DICTIONARY_ADDRESS_BITS {
             bail!(
                 "unsupported dictionary address width in index header: {dictionary_address_bits}"
             );
         }
 
-        let entry_count = u64::from_le_bytes(bytes[160..168].try_into().expect("slice length"));
+        let entry_count = u64::from_le_bytes(
+            bytes[ENTRY_COUNT_OFFSET..ENTRY_COUNT_OFFSET + 8]
+                .try_into()
+                .expect("slice length"),
+        );
 
-        let reserved = &bytes[168..];
+        let reserved = &bytes[RESERVED_OFFSET..RESERVED_OFFSET + RESERVED_LEN];
         if reserved.iter().any(|&b| b != 0) {
             bail!("nonzero reserved bytes in index header");
         }
@@ -144,6 +166,26 @@ impl IndexHeaderV1 {
         }
 
         Ok(header)
+    }
+
+    pub(crate) fn validate_algorithm_name(&self, supplied_algorithm_name: &str) -> Result<()> {
+        if self.hash_name != supplied_algorithm_name {
+            bail!(
+                "index algorithm mismatch: header={}, requested={}",
+                self.hash_name,
+                supplied_algorithm_name
+            );
+        }
+        Ok(())
+    }
+
+    pub(crate) fn require_lookup_ready(&self) -> Result<()> {
+        match self.state {
+            IndexState::Sorted => Ok(()),
+            IndexState::Creating => bail!("index build did not finish cleanly"),
+            IndexState::Created => bail!("index is not sorted"),
+            IndexState::Sorting => bail!("index sort did not finish cleanly"),
+        }
     }
 }
 
@@ -248,6 +290,13 @@ pub(crate) fn read_index_metadata(index_path: &Path) -> Result<IndexFormatMetada
         entry_size: ENTRY_SIZE,
         entry_count: file_size / ENTRY_SIZE as u64,
     })
+}
+
+pub(crate) fn write_header(writer: &mut (impl Write + Seek), header: &IndexHeaderV1) -> Result<()> {
+    writer.seek(SeekFrom::Start(0))?;
+    writer.write_all(&header.encode())?;
+    writer.flush()?;
+    Ok(())
 }
 
 fn bits_to_bytes(bits: u32) -> usize {

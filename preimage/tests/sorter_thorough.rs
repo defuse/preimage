@@ -15,6 +15,8 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use tempfile::NamedTempFile;
 
+const HEADER_SIZE_V1: usize = 256;
+
 /// Write entries to a temp file and return the file.
 fn write_entries(entries: &[IndexEntry]) -> NamedTempFile {
     let mut f = NamedTempFile::new().expect("temp file");
@@ -28,15 +30,20 @@ fn write_entries(entries: &[IndexEntry]) -> NamedTempFile {
 /// Read all entries back from a file.
 fn read_all_entries(path: &std::path::Path) -> Vec<IndexEntry> {
     let data = std::fs::read(path).expect("read file");
+    let entry_bytes = if data.len() >= HEADER_SIZE_V1 && (data.len() - HEADER_SIZE_V1) % ENTRY_SIZE == 0 {
+        &data[HEADER_SIZE_V1..]
+    } else {
+        &data[..]
+    };
     assert_eq!(
-        data.len() % ENTRY_SIZE,
+        entry_bytes.len() % ENTRY_SIZE,
         0,
         "file size {} not a multiple of ENTRY_SIZE",
         data.len()
     );
-    let count = data.len() / ENTRY_SIZE;
+    let count = entry_bytes.len() / ENTRY_SIZE;
     let mut entries = Vec::with_capacity(count);
-    let mut cursor = &data[..];
+    let mut cursor = entry_bytes;
     for _ in 0..count {
         entries.push(IndexEntry::read_from(&mut cursor).expect("read entry"));
     }

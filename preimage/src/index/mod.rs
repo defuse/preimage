@@ -6,6 +6,7 @@ pub mod entry;
 pub(crate) mod header;
 pub mod lookup;
 pub(crate) mod sorter;
+use self::header::read_index_metadata;
 
 /// An index file on disk mapping hash prefixes to wordlist positions.
 ///
@@ -30,14 +31,6 @@ impl IndexFile {
 
     /// Count the number of entries in the index file.
     pub fn entry_count(&self) -> anyhow::Result<u64> {
-        let size = std::fs::metadata(&self.path)?.len();
-        if size % entry::ENTRY_SIZE as u64 != 0 {
-            anyhow::bail!(
-                "index file size {} is not a multiple of entry size {}",
-                size,
-                entry::ENTRY_SIZE
-            );
-        }
-        Ok(size / entry::ENTRY_SIZE as u64)
+        Ok(read_index_metadata(&self.path)?.entry_count())
     }
 }

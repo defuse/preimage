@@ -5,6 +5,7 @@ use anyhow::Result;
 use indicatif::ProgressBar;
 
 use super::entry::IndexEntry;
+use super::header::{write_header, IndexHeaderV1, IndexState};
 use crate::HashAlgorithm;
 
 impl super::IndexFile {
@@ -51,7 +52,11 @@ impl IndexBuilder {
         let file_len = wordlist.metadata()?.len();
         let mut reader = BufReader::new(wordlist);
 
-        let output = std::fs::File::create(output_path)?;
+        let mut output = std::fs::File::create(output_path)?;
+        write_header(
+            &mut output,
+            &IndexHeaderV1::new(IndexState::Creating, algorithm.name(), 0),
+        )?;
         let mut writer = BufWriter::new(output);
 
         if let Some(pb) = progress {
@@ -104,6 +109,11 @@ impl IndexBuilder {
         }
 
         writer.flush()?;
+        let mut output = writer.into_inner()?;
+        write_header(
+            &mut output,
+            &IndexHeaderV1::new(IndexState::Created, algorithm.name(), entries_written),
+        )?;
         Ok(entries_written)
     }
 }
@@ -112,6 +122,7 @@ impl IndexBuilder {
 mod tests {
     use super::*;
     use crate::entry::ENTRY_SIZE;
+    use crate::index::header::{read_index_metadata, IndexFormatMetadata, HEADER_SIZE_V1};
     use crate::Md5;
     use tempfile::NamedTempFile;
 
@@ -130,11 +141,22 @@ mod tests {
 
         assert!(count > 0, "should write at least one entry");
 
+        let metadata = read_index_metadata(output.path()).expect("metadata");
+        assert_eq!(
+            metadata,
+            IndexFormatMetadata::HeaderV1 {
+                data_offset: HEADER_SIZE_V1 as u64,
+                entry_size: ENTRY_SIZE,
+                entry_count: count,
+                header: IndexHeaderV1::new(IndexState::Created, "md5", count),
+            }
+        );
+
         let file_len = std::fs::metadata(output.path()).expect("metadata").len();
         assert_eq!(
             file_len,
-            count * ENTRY_SIZE as u64,
-            "file size should be entry_count * ENTRY_SIZE"
+            HEADER_SIZE_V1 as u64 + count * ENTRY_SIZE as u64,
+            "file size should be header + entry_count * ENTRY_SIZE"
         );
     }
 
@@ -151,9 +173,15 @@ mod tests {
         assert_eq!(count, 2);
 
         let data = std::fs::read(output.path()).expect("read");
-        let entry0 = IndexEntry::read_from(&mut &data[0..ENTRY_SIZE]).expect("read entry");
+        let entry0 = IndexEntry::read_from(
+            &mut &data[HEADER_SIZE_V1..HEADER_SIZE_V1 + ENTRY_SIZE],
+        )
+        .expect("read entry");
         let entry1 =
-            IndexEntry::read_from(&mut &data[ENTRY_SIZE..2 * ENTRY_SIZE]).expect("read entry");
+            IndexEntry::read_from(
+                &mut &data[HEADER_SIZE_V1 + ENTRY_SIZE..HEADER_SIZE_V1 + 2 * ENTRY_SIZE],
+            )
+            .expect("read entry");
 
         assert_eq!(entry0.position(), 0, "apple should be at position 0");
         assert_eq!(entry1.position(), 6, "banana should be at position 6");
@@ -169,7 +197,8 @@ mod tests {
         IndexBuilder::build(&Md5, wordlist.path(), output.path(), None).expect("build failed");
 
         let data = std::fs::read(output.path()).expect("read");
-        let entry = IndexEntry::read_from(&mut &data[..]).expect("read entry");
+        let entry = IndexEntry::read_from(&mut &data[HEADER_SIZE_V1..HEADER_SIZE_V1 + ENTRY_SIZE])
+            .expect("read entry");
 
         // MD5("hello") = 5d41402abc4b2a76b9719d911017c592
         // First 8 bytes: 5d41402abc4b2a76
@@ -193,11 +222,15 @@ mod tests {
 
         // Verify first entry hashes the raw bytes [0xFF, 0xFE]
         let data = std::fs::read(output.path()).expect("read");
-        let entry0 = IndexEntry::read_from(&mut &data[0..ENTRY_SIZE]).expect("read entry");
+        let entry0 = IndexEntry::read_from(
+            &mut &data[HEADER_SIZE_V1..HEADER_SIZE_V1 + ENTRY_SIZE],
+        )
+        .expect("read entry");
 
         let expected_hash = Md5.hash(&[0xFF, 0xFE]).expect("md5 should hash any bytes");
         let mut expected_prefix = [0u8; 8];
         expected_prefix.copy_from_slice(&expected_hash[..8]);
         assert_eq!(entry0.hash_prefix, expected_prefix);
     }
+
 }
