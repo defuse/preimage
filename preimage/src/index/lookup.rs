@@ -449,4 +449,27 @@ mod tests {
             .expect("should reject");
         assert_eq!(err.to_string(), "index sort did not finish cleanly");
     }
+
+    #[test]
+    fn test_open_rejects_index_in_created_state() {
+        let wordlist = NamedTempFile::new().expect("temp file");
+        let mut index = NamedTempFile::new().expect("temp file");
+        write_header(&mut index, &IndexHeaderV1::new(IndexState::Created, "md5", 0))
+            .expect("write header");
+
+        let err = LookupTable::open(MD5, index.path(), wordlist.path())
+            .err()
+            .expect("should reject");
+        assert_eq!(err.to_string(), "index is not sorted");
+    }
+
+    #[test]
+    fn test_open_accepts_sorted_headered_index_without_structural_check() {
+        let wordlist = NamedTempFile::new().expect("temp file");
+        let mut index = NamedTempFile::new().expect("temp file");
+        write_header(&mut index, &IndexHeaderV1::new(IndexState::Sorted, "md5", 0))
+            .expect("write header");
+
+        LookupTable::open(MD5, index.path(), wordlist.path()).expect("open sorted headered index");
+    }
 }

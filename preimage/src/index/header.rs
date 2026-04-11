@@ -353,6 +353,16 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_rejects_unknown_state() {
+        let header = IndexHeaderV1::new(IndexState::Created, "md5", 0);
+        let mut encoded = header.encode();
+        encoded[20..24].copy_from_slice(&99u32.to_le_bytes());
+
+        let err = IndexHeaderV1::decode(&encoded).expect_err("should reject");
+        assert_eq!(err.to_string(), "unknown index state: 99");
+    }
+
+    #[test]
     fn test_decode_rejects_nonzero_reserved() {
         let header = IndexHeaderV1::new(IndexState::Created, "md5", 0);
         let mut encoded = header.encode();
@@ -377,6 +387,33 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_rejects_empty_hash_name() {
+        let header = IndexHeaderV1::new(IndexState::Created, "md5", 0);
+        let mut encoded = header.encode();
+        encoded[24] = 0;
+        for byte in &mut encoded[25..152] {
+            *byte = 0;
+        }
+
+        let err = IndexHeaderV1::decode(&encoded).expect_err("should reject");
+        assert_eq!(err.to_string(), "index header hash name is empty");
+    }
+
+    #[test]
+    fn test_decode_rejects_non_nul_padded_hash_name() {
+        let header = IndexHeaderV1::new(IndexState::Created, "md5", 0);
+        let mut encoded = header.encode();
+        encoded[27] = 0;
+        encoded[28] = b'x';
+        for byte in &mut encoded[29..152] {
+            *byte = 0;
+        }
+
+        let err = IndexHeaderV1::decode(&encoded).expect_err("should reject");
+        assert_eq!(err.to_string(), "index header hash name is not NUL-padded ASCII");
+    }
+
+    #[test]
     fn test_decode_rejects_unsupported_hash_name() {
         let header = IndexHeaderV1::new(IndexState::Created, "md5", 0);
         let mut encoded = header.encode();
@@ -391,6 +428,32 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "unsupported hash algorithm in index header: not-a-real-hash"
+        );
+    }
+
+    #[test]
+    fn test_decode_rejects_unsupported_hash_prefix_bits() {
+        let header = IndexHeaderV1::new(IndexState::Created, "md5", 0);
+        let mut encoded = header.encode();
+        encoded[152..156].copy_from_slice(&32u32.to_le_bytes());
+
+        let err = IndexHeaderV1::decode(&encoded).expect_err("should reject");
+        assert_eq!(
+            err.to_string(),
+            "unsupported hash prefix width in index header: 32"
+        );
+    }
+
+    #[test]
+    fn test_decode_rejects_unsupported_dictionary_address_bits() {
+        let header = IndexHeaderV1::new(IndexState::Created, "md5", 0);
+        let mut encoded = header.encode();
+        encoded[156..160].copy_from_slice(&40u32.to_le_bytes());
+
+        let err = IndexHeaderV1::decode(&encoded).expect_err("should reject");
+        assert_eq!(
+            err.to_string(),
+            "unsupported dictionary address width in index header: 40"
         );
     }
 
@@ -446,6 +509,42 @@ mod tests {
                 "index payload size does not match header entry count: payload={}, expected={}",
                 ENTRY_SIZE * 2,
                 ENTRY_SIZE * 3
+            )
+        );
+    }
+
+    #[test]
+    fn test_read_index_metadata_rejects_truncated_header() {
+        let mut file = NamedTempFile::new().expect("temp file");
+        file.write_all(HEADER_MAGIC).expect("write magic");
+        file.flush().expect("flush");
+
+        let err = read_index_metadata(file.path()).expect_err("should reject");
+        assert_eq!(
+            err.to_string(),
+            format!(
+                "index file is truncated inside header: {} < {}",
+                HEADER_MAGIC.len(),
+                HEADER_SIZE_V1
+            )
+        );
+    }
+
+    #[test]
+    fn test_read_index_metadata_rejects_payload_with_partial_entry() {
+        let mut file = NamedTempFile::new().expect("temp file");
+        let header = IndexHeaderV1::new(IndexState::Sorted, "md5", 1);
+        file.write_all(&header.encode()).expect("write header");
+        file.write_all(&[0u8; ENTRY_SIZE - 1]).expect("write partial payload");
+        file.flush().expect("flush");
+
+        let err = read_index_metadata(file.path()).expect_err("should reject");
+        assert_eq!(
+            err.to_string(),
+            format!(
+                "index payload size does not match header entry count: payload={}, expected={}",
+                ENTRY_SIZE - 1,
+                ENTRY_SIZE
             )
         );
     }
