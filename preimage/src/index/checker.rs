@@ -1,10 +1,11 @@
-use std::io::BufReader;
+use std::io::{BufReader, Seek, SeekFrom};
 use std::path::Path;
 
 use anyhow::Result;
 use indicatif::ProgressBar;
 
 use super::entry::{IndexEntry, ENTRY_SIZE};
+use super::header::read_index_metadata;
 
 impl super::IndexFile {
     /// Check whether the index file is sorted by hash prefix.
@@ -18,26 +19,22 @@ impl super::IndexFile {
 /// Returns `true` if every entry's hash prefix is >= the previous entry's.
 /// Returns `false` if any out-of-order pair is found.
 pub fn check_sorted(index_path: &Path, progress: Option<&ProgressBar>) -> Result<bool> {
-    let file = std::fs::File::open(index_path)?;
-    let file_size = file.metadata()?.len();
-
-    if file_size == 0 {
+    let metadata = read_index_metadata(index_path)?;
+    if metadata.entry_count() == 0 {
         return Ok(true);
     }
-
-    if file_size % ENTRY_SIZE as u64 != 0 {
-        anyhow::bail!(
-            "index file size {} is not a multiple of entry size {}",
-            file_size,
-            ENTRY_SIZE
-        );
-    }
-
-    let num_entries = file_size / ENTRY_SIZE as u64;
+    assert_eq!(
+        metadata.entry_size(),
+        ENTRY_SIZE,
+        "header parser must reject unsupported entry sizes before checker runs"
+    );
+    let num_entries = metadata.entry_count();
     if let Some(pb) = progress {
         pb.set_length(num_entries);
     }
 
+    let mut file = std::fs::File::open(index_path)?;
+    file.seek(SeekFrom::Start(metadata.data_offset()))?;
     let mut reader = BufReader::new(file);
     let mut prev = IndexEntry::read_from(&mut reader)?;
 

@@ -6,6 +6,7 @@ use anyhow::{bail, Result};
 use memmap2::Mmap;
 
 use super::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
+use super::header::read_index_metadata;
 use crate::HashAlgorithm;
 
 /// A match from looking up one hash against one index.
@@ -86,6 +87,7 @@ pub struct LookupTable {
     index_mmap: Mmap,
     dict_path: PathBuf,
     entry_count: u64,
+    data_offset: usize,
 }
 
 impl LookupTable {
@@ -98,18 +100,17 @@ impl LookupTable {
         index_path: &Path,
         dict_path: &Path,
     ) -> Result<Self> {
-        let index_file = File::open(index_path)?;
-        let file_size = index_file.metadata()?.len();
-
-        if file_size % ENTRY_SIZE as u64 != 0 {
-            bail!(
-                "index file size {} is not a multiple of entry size {}",
-                file_size,
-                ENTRY_SIZE
-            );
+        let metadata = read_index_metadata(index_path)?;
+        if let Some(header) = metadata.header() {
+            header.validate_algorithm_name(algorithm.name())?;
+            header.require_lookup_ready()?;
         }
-
-        let entry_count = file_size / ENTRY_SIZE as u64;
+        assert_eq!(
+            metadata.entry_size(),
+            ENTRY_SIZE,
+            "header parser must reject unsupported entry sizes before lookup opens"
+        );
+        let index_file = File::open(index_path)?;
 
         // SAFETY: memmap2::Mmap::map requires the file not be modified while mapped.
         // We open the index read-only and never modify it.
@@ -119,7 +120,8 @@ impl LookupTable {
             algorithm,
             index_mmap,
             dict_path: dict_path.to_path_buf(),
-            entry_count,
+            entry_count: metadata.entry_count(),
+            data_offset: metadata.data_offset() as usize,
         })
     }
 
@@ -205,7 +207,7 @@ impl LookupTable {
 
     /// Read the 8-byte hash prefix of an entry directly from the mmap.
     fn get_entry_prefix(&self, index: u64) -> [u8; HASH_PREFIX_LEN] {
-        let offset = index as usize * ENTRY_SIZE;
+        let offset = self.data_offset + index as usize * ENTRY_SIZE;
         let mut prefix = [0u8; HASH_PREFIX_LEN];
         prefix.copy_from_slice(&self.index_mmap[offset..offset + HASH_PREFIX_LEN]);
         prefix
@@ -213,7 +215,7 @@ impl LookupTable {
 
     /// Read the 48-bit LE position of an entry directly from the mmap.
     fn get_entry_position(&self, index: u64) -> u64 {
-        let offset = index as usize * ENTRY_SIZE + HASH_PREFIX_LEN;
+        let offset = self.data_offset + index as usize * ENTRY_SIZE + HASH_PREFIX_LEN;
         let bytes: &[u8; POSITION_LEN] = self.index_mmap[offset..offset + POSITION_LEN]
             .try_into()
             .expect("slice is exactly POSITION_LEN bytes");
@@ -260,10 +262,14 @@ fn read_word_at(file: &mut File, position: u64) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+
     use crate::index::builder::IndexBuilder;
+    use crate::index::entry::IndexEntry;
+    use crate::index::header::{write_header, IndexHeaderV1, IndexState};
     use crate::index::sorter::IndexSorter;
-    use crate::{Md5, MD5};
-    use tempfile::NamedTempFile;
+    use crate::{Md5, MD5, SHA1};
+    use tempfile::{NamedTempFile, TempDir};
 
     fn test_words_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -272,12 +278,13 @@ mod tests {
             .join("words.txt")
     }
 
-    fn build_and_sort(algorithm: &dyn HashAlgorithm, wordlist: &Path) -> NamedTempFile {
-        let index = NamedTempFile::new().expect("temp file");
-        IndexBuilder::build(algorithm, wordlist, index.path(), None).expect("build");
+    fn build_and_sort(algorithm: &dyn HashAlgorithm, wordlist: &Path) -> (TempDir, PathBuf) {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let index_path = dir.path().join("index.idx");
+        IndexBuilder::build(algorithm, wordlist, &index_path, None).expect("build");
         let mut sorter = IndexSorter::new(1024 * 1024);
-        sorter.sort_file(index.path(), None).expect("sort");
-        index
+        sorter.sort_file(&index_path, None).expect("sort");
+        (dir, index_path)
     }
 
     #[test]
@@ -286,8 +293,8 @@ mod tests {
         let mut wordlist = NamedTempFile::new().expect("temp file");
         std::io::Write::write_all(&mut wordlist, b"hello\n").expect("write");
 
-        let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
+        let (_dir, index_path) = build_and_sort(&Md5, wordlist.path());
+        let table = LookupTable::open(MD5, &index_path, wordlist.path()).expect("open");
 
         let matches = table
             .lookup("5d41402abc4b2a76b9719d911017c592")
@@ -302,8 +309,8 @@ mod tests {
         let mut wordlist = NamedTempFile::new().expect("temp file");
         std::io::Write::write_all(&mut wordlist, b"hello\n").expect("write");
 
-        let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
+        let (_dir, index_path) = build_and_sort(&Md5, wordlist.path());
+        let table = LookupTable::open(MD5, &index_path, wordlist.path()).expect("open");
 
         let matches = table
             .lookup("ffffffffffffffffffffffffffffffff")
@@ -313,8 +320,8 @@ mod tests {
 
     #[test]
     fn test_lookup_from_test_words() {
-        let index = build_and_sort(&Md5, &test_words_path());
-        let table = LookupTable::open(MD5, index.path(), &test_words_path()).expect("open");
+        let (_dir, index_path) = build_and_sort(&Md5, &test_words_path());
+        let table = LookupTable::open(MD5, &index_path, &test_words_path()).expect("open");
 
         // MD5("apple") = 1f3870be274f6c49b3e31a0c6728957f
         let matches = table
@@ -329,8 +336,8 @@ mod tests {
     fn test_lookup_invalid_hex() {
         let mut wordlist = NamedTempFile::new().expect("temp file");
         std::io::Write::write_all(&mut wordlist, b"hello\n").expect("write");
-        let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
+        let (_dir, index_path) = build_and_sort(&Md5, wordlist.path());
+        let table = LookupTable::open(MD5, &index_path, wordlist.path()).expect("open");
 
         assert!(table.lookup("xyz").is_err());
         assert!(table.lookup("5d4140").is_err()); // too short
@@ -340,8 +347,8 @@ mod tests {
     fn test_lookup_empty_index() {
         let mut wordlist = NamedTempFile::new().expect("temp file");
         std::io::Write::write_all(&mut wordlist, b"").expect("write");
-        let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
+        let (_dir, index_path) = build_and_sort(&Md5, wordlist.path());
+        let table = LookupTable::open(MD5, &index_path, wordlist.path()).expect("open");
 
         let matches = table
             .lookup("5d41402abc4b2a76b9719d911017c592")
@@ -355,8 +362,8 @@ mod tests {
         // Write binary word: [0xFF, 0xFE] then newline
         std::io::Write::write_all(&mut wordlist, &[0xFF, 0xFE, b'\n']).expect("write");
 
-        let index = build_and_sort(&Md5, wordlist.path());
-        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open");
+        let (_dir, index_path) = build_and_sort(&Md5, wordlist.path());
+        let table = LookupTable::open(MD5, &index_path, wordlist.path()).expect("open");
 
         // MD5 of raw bytes [0xFF, 0xFE]
         let hash = hex::encode(Md5.hash(&[0xFF, 0xFE]).expect("md5"));
@@ -364,5 +371,105 @@ mod tests {
         assert_eq!(matches.len(), 1);
         assert!(matches[0].is_full());
         assert_eq!(matches[0].plaintext(), &[0xFF, 0xFE]);
+    }
+
+    #[test]
+    fn test_open_rejects_unsorted_index() {
+        let mut wordlist = NamedTempFile::new().expect("temp file");
+        std::io::Write::write_all(&mut wordlist, b"apple\nbanana\norange\n").expect("write");
+
+        let index = NamedTempFile::new().expect("temp file");
+        IndexBuilder::build(&Md5, wordlist.path(), index.path(), None).expect("build");
+
+        let open = LookupTable::open(MD5, index.path(), wordlist.path());
+        assert!(
+            open.is_err(),
+            "lookup tables should reject unsorted indexes instead of silently returning false negatives"
+        );
+    }
+
+    #[test]
+    fn test_open_rejects_wrong_algorithm_for_headered_index() {
+        let (_dir, index_path) = build_and_sort(&Md5, &test_words_path());
+
+        let err = LookupTable::open(SHA1, &index_path, &test_words_path())
+            .err()
+            .expect("should reject");
+        assert_eq!(
+            err.to_string(),
+            "index algorithm mismatch: header=md5, requested=sha1"
+        );
+    }
+
+    #[test]
+    fn test_open_accepts_legacy_index_without_header() {
+        let mut wordlist = NamedTempFile::new().expect("temp file");
+        std::io::Write::write_all(&mut wordlist, b"apple\n").expect("write");
+
+        let index = NamedTempFile::new().expect("temp file");
+        let entry = IndexEntry::new(
+            [0x1f, 0x38, 0x70, 0xbe, 0x27, 0x4f, 0x6c, 0x49],
+            0,
+        );
+        let mut index = index;
+        entry.write_to(&mut index).expect("write legacy entry");
+        index.flush().expect("flush");
+
+        let table = LookupTable::open(MD5, index.path(), wordlist.path()).expect("open legacy");
+        let matches = table
+            .lookup("1f3870be274f6c49b3e31a0c6728957f")
+            .expect("lookup");
+        assert_eq!(matches.len(), 1);
+        assert!(matches[0].is_full());
+        assert_eq!(matches[0].plaintext(), b"apple");
+    }
+
+    #[test]
+    fn test_open_rejects_index_in_creating_state() {
+        let wordlist = NamedTempFile::new().expect("temp file");
+        let mut index = NamedTempFile::new().expect("temp file");
+        write_header(&mut index, &IndexHeaderV1::new(IndexState::Creating, "md5", 0))
+            .expect("write header");
+
+        let err = LookupTable::open(MD5, index.path(), wordlist.path())
+            .err()
+            .expect("should reject");
+        assert_eq!(err.to_string(), "index build did not finish cleanly");
+    }
+
+    #[test]
+    fn test_open_rejects_index_in_sorting_state() {
+        let wordlist = NamedTempFile::new().expect("temp file");
+        let mut index = NamedTempFile::new().expect("temp file");
+        write_header(&mut index, &IndexHeaderV1::new(IndexState::Sorting, "md5", 0))
+            .expect("write header");
+
+        let err = LookupTable::open(MD5, index.path(), wordlist.path())
+            .err()
+            .expect("should reject");
+        assert_eq!(err.to_string(), "index sort did not finish cleanly");
+    }
+
+    #[test]
+    fn test_open_rejects_index_in_created_state() {
+        let wordlist = NamedTempFile::new().expect("temp file");
+        let mut index = NamedTempFile::new().expect("temp file");
+        write_header(&mut index, &IndexHeaderV1::new(IndexState::Created, "md5", 0))
+            .expect("write header");
+
+        let err = LookupTable::open(MD5, index.path(), wordlist.path())
+            .err()
+            .expect("should reject");
+        assert_eq!(err.to_string(), "index is not sorted");
+    }
+
+    #[test]
+    fn test_open_accepts_sorted_headered_index_without_structural_check() {
+        let wordlist = NamedTempFile::new().expect("temp file");
+        let mut index = NamedTempFile::new().expect("temp file");
+        write_header(&mut index, &IndexHeaderV1::new(IndexState::Sorted, "md5", 0))
+            .expect("write header");
+
+        LookupTable::open(MD5, index.path(), wordlist.path()).expect("open sorted headered index");
     }
 }

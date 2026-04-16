@@ -138,10 +138,10 @@ fn main() {
     generate_wordlist(&wordlist_path, cli.entries);
 
     // Phase B: Build index
-    let (entry_count, freshly_built) = build_index(algorithm, &wordlist_path, &index_path);
+    let entry_count = build_index(algorithm, &wordlist_path, &index_path);
 
-    // Phase C: Sort index (skip check if reusing a previously-sorted index)
-    sort_index(&index_path, entry_count, cli.memory, freshly_built);
+    // Phase C: Validate and sort index if needed
+    sort_index(&index_path, entry_count, cli.memory);
 
     println!();
 
@@ -221,12 +221,11 @@ fn generate_wordlist(path: &Path, entries: u64) {
     );
 }
 
-/// Returns (entry_count, freshly_built).
 fn build_index(
     algorithm: &'static dyn HashAlgorithm,
     wordlist_path: &Path,
     index_path: &Path,
-) -> (u64, bool) {
+) -> u64 {
     if index_path.exists() {
         let index = IndexFile::open(index_path);
         let count = index.entry_count().expect("failed to read entry count");
@@ -235,7 +234,7 @@ fn build_index(
             index_path.display(),
             file_size(index_path)
         );
-        return (count, false);
+        return count;
     }
 
     let pb = progress_bar(0, "Building index");
@@ -248,8 +247,7 @@ fn build_index(
 
     let count = index.entry_count().expect("failed to read entry count");
     let secs = elapsed.as_secs_f64();
-    let rate = count as f64 / secs;
-    let per_entry_us = secs * 1_000_000.0 / count as f64;
+    let (rate, per_entry_us) = per_entry_stats(count, secs);
 
     println!(
         "Index build:  {:.2}s ({}, {} entries, {:.0} entries/sec, {:.2}us/entry)",
@@ -260,16 +258,10 @@ fn build_index(
         per_entry_us,
     );
 
-    (count, true)
+    count
 }
 
-fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_built: bool) {
-    if !freshly_built {
-        println!("Sort check:   skipped (reusing existing index)");
-        println!("Index sort:   skipped (reusing existing index)");
-        return;
-    }
-
+fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize) {
     let check_pb = progress_bar(entry_count, "Checking sort");
     let check_start = Instant::now();
     let index = IndexFile::open(index_path);
@@ -279,8 +271,7 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_
     check_pb.finish_and_clear();
     let check_elapsed = check_start.elapsed();
     let check_secs = check_elapsed.as_secs_f64();
-    let check_rate = entry_count as f64 / check_secs;
-    let check_per_entry_us = check_secs * 1_000_000.0 / entry_count as f64;
+    let (check_rate, check_per_entry_us) = per_entry_stats(entry_count, check_secs);
 
     println!(
         "Sort check:   {:.2}s ({} entries, {:.0} entries/sec, {:.2}us/entry)",
@@ -312,8 +303,7 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_
     let elapsed = start.elapsed();
 
     let secs = elapsed.as_secs_f64();
-    let rate = entry_count as f64 / secs;
-    let per_entry_us = secs * 1_000_000.0 / entry_count as f64;
+    let (rate, per_entry_us) = per_entry_stats(entry_count, secs);
 
     println!(
         "Index sort:   {:.2}s ({} entries, {:.0} entries/sec, {:.2}us/entry)",
@@ -332,7 +322,7 @@ fn generate_lookup_hash(
     entry_count: u64,
     hash_hex_len: usize,
 ) -> String {
-    if rng.gen_bool(0.5) {
+    if entry_count > 0 && rng.gen_bool(0.5) {
         // Real hash: pick a random word from the wordlist, hash it
         let idx = rng.gen_range(0..entry_count);
         let word = nth_word(idx);
@@ -495,6 +485,17 @@ fn format_count(n: u64) -> String {
     result.chars().rev().collect()
 }
 
+fn per_entry_stats(entry_count: u64, secs: f64) -> (f64, f64) {
+    if entry_count == 0 || secs == 0.0 {
+        (0.0, 0.0)
+    } else {
+        (
+            entry_count as f64 / secs,
+            secs * 1_000_000.0 / entry_count as f64,
+        )
+    }
+}
+
 fn format_duration(d: Duration) -> String {
     let us = d.as_micros();
     if us < 1_000 {
@@ -503,5 +504,52 @@ fn format_duration(d: Duration) -> String {
         format!("{:.2}ms", us as f64 / 1_000.0)
     } else {
         format!("{:.2}s", us as f64 / 1_000_000.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_generate_lookup_hash_handles_zero_entries() {
+        let algorithm = get_algorithm("md5").expect("md5 registered");
+        let mut rng = SmallRng::seed_from_u64(42);
+
+        for _ in 0..1024 {
+            let hash = generate_lookup_hash(algorithm, &mut rng, 0, 32);
+            assert_eq!(hash.len(), 32, "generated hash hex should be the requested length");
+        }
+    }
+
+    #[test]
+    fn test_sort_index_reused_existing_index_is_validated() {
+        let dir = tempdir().expect("temp dir");
+        let index_path = dir.path().join("words.idx");
+        let wordlist_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("test_data")
+            .join("words.txt");
+
+        let algorithm = get_algorithm("md5").expect("md5 registered");
+        let index = IndexFile::build(algorithm, &wordlist_path, &index_path, None).expect("build");
+        let entry_count = index.entry_count().expect("entry count");
+        assert!(
+            !index.check_sorted(None).expect("check sorted"),
+            "fixture should start unsorted"
+        );
+
+        let reused_count = build_index(algorithm, &wordlist_path, &index_path);
+        assert_eq!(reused_count, entry_count);
+
+        sort_index(&index_path, reused_count, 1024 * 1024);
+
+        assert!(
+            IndexFile::open(&index_path)
+                .check_sorted(None)
+                .expect("check sorted after benchmark setup"),
+            "benchmark setup should reject or repair an existing unsorted index before lookup benchmarking"
+        );
     }
 }

@@ -6,6 +6,7 @@ use anyhow::{bail, Result};
 use indicatif::ProgressBar;
 
 use super::entry::{IndexEntry, ENTRY_SIZE};
+use super::header::{read_index_metadata, write_header, IndexFormatMetadata, IndexState};
 
 impl super::IndexFile {
     /// Sort the index file in-place with the given memory budget (in bytes).
@@ -57,9 +58,13 @@ impl IndexSorter {
         index_path: &Path,
         progress: Option<&ProgressBar>,
     ) -> Result<()> {
-        let (mut file, num_entries) = self.open_and_validate(index_path)?;
-        if num_entries <= 1 {
-            return Ok(());
+        let (mut file, metadata) = self.open_and_validate(index_path)?;
+        let num_entries = metadata.entry_count();
+        let data_offset = metadata.data_offset();
+        let mut header = metadata.header().cloned();
+        if let Some(header) = &mut header {
+            header.state = IndexState::Sorting;
+            write_header(&mut file, header)?;
         }
 
         let buf_count = (self.memory_bytes / ENTRY_SIZE).min(num_entries as usize);
@@ -68,13 +73,21 @@ impl IndexSorter {
         self.entries_sorted = 0;
         self.total_entries = num_entries;
 
-        self.quicksort_file(
-            &mut file,
-            0,
-            num_entries as i64 - 1,
-            buf_count as i64,
-            progress,
-        )?;
+        if num_entries > 1 {
+            self.quicksort_file(
+                &mut file,
+                data_offset,
+                0,
+                num_entries as i64 - 1,
+                buf_count as i64,
+                progress,
+            )?;
+        }
+
+        if let Some(header) = &mut header {
+            header.state = IndexState::Sorted;
+            write_header(&mut file, header)?;
+        }
 
         Ok(())
     }
@@ -86,9 +99,13 @@ impl IndexSorter {
         index_path: &Path,
         progress: Option<&ProgressBar>,
     ) -> Result<()> {
-        let (mut file, num_entries) = self.open_and_validate(index_path)?;
-        if num_entries <= 1 {
-            return Ok(());
+        let (mut file, metadata) = self.open_and_validate(index_path)?;
+        let num_entries = metadata.entry_count();
+        let data_offset = metadata.data_offset();
+        let mut header = metadata.header().cloned();
+        if let Some(header) = &mut header {
+            header.state = IndexState::Sorting;
+            write_header(&mut file, header)?;
         }
 
         // Grow buffer to fit the entire file
@@ -99,24 +116,30 @@ impl IndexSorter {
 
         self.entries_sorted = 0;
         self.total_entries = num_entries;
-        self.sort_partition_in_memory(&mut file, 0, num_entries as i64 - 1, progress)?;
+        if num_entries > 1 {
+            self.sort_partition_in_memory(&mut file, data_offset, 0, num_entries as i64 - 1, progress)?;
+        }
+
+        if let Some(header) = &mut header {
+            header.state = IndexState::Sorted;
+            write_header(&mut file, header)?;
+        }
 
         Ok(())
     }
 
-    fn open_and_validate(&self, index_path: &Path) -> Result<(File, u64)> {
-        let file = File::options().read(true).write(true).open(index_path)?;
-        let file_size = file.metadata()?.len();
-
-        if file_size % ENTRY_SIZE as u64 != 0 {
-            bail!(
-                "index file size {} is not a multiple of entry size {}",
-                file_size,
-                ENTRY_SIZE
-            );
+    fn open_and_validate(&self, index_path: &Path) -> Result<(File, IndexFormatMetadata)> {
+        let metadata = read_index_metadata(index_path)?;
+        if let Some(header) = metadata.header() {
+            match header.state {
+                IndexState::Creating => bail!("index build did not finish cleanly"),
+                IndexState::Sorting => bail!("index sort did not finish cleanly"),
+                IndexState::Created | IndexState::Sorted => {}
+            }
         }
 
-        Ok((file, file_size / ENTRY_SIZE as u64))
+        let file = File::options().read(true).write(true).open(index_path)?;
+        Ok((file, metadata))
     }
 
     fn update_progress(&self, pb: &ProgressBar, action: &str) {
@@ -132,6 +155,7 @@ impl IndexSorter {
     fn quicksort_file(
         &mut self,
         file: &mut File,
+        data_offset: u64,
         lower: i64,
         upper: i64,
         buf_count: i64,
@@ -144,17 +168,17 @@ impl IndexSorter {
 
         if size <= buf_count {
             // Fast path: load into memory, sort, write back.
-            self.sort_partition_in_memory(file, lower, upper, progress)?;
+            self.sort_partition_in_memory(file, data_offset, lower, upper, progress)?;
         } else {
-            let pivot = self.partition_file(file, lower, upper, progress)?;
+            let pivot = self.partition_file(file, data_offset, lower, upper, progress)?;
 
             // Sort smaller partition first to limit stack depth.
             if (pivot - 1) - lower > upper - (pivot + 1) {
-                self.quicksort_file(file, pivot + 1, upper, buf_count, progress)?;
-                self.quicksort_file(file, lower, pivot - 1, buf_count, progress)?;
+                self.quicksort_file(file, data_offset, pivot + 1, upper, buf_count, progress)?;
+                self.quicksort_file(file, data_offset, lower, pivot - 1, buf_count, progress)?;
             } else {
-                self.quicksort_file(file, lower, pivot - 1, buf_count, progress)?;
-                self.quicksort_file(file, pivot + 1, upper, buf_count, progress)?;
+                self.quicksort_file(file, data_offset, lower, pivot - 1, buf_count, progress)?;
+                self.quicksort_file(file, data_offset, pivot + 1, upper, buf_count, progress)?;
             }
         }
 
@@ -165,6 +189,7 @@ impl IndexSorter {
     fn sort_partition_in_memory(
         &mut self,
         file: &mut File,
+        data_offset: u64,
         lower: i64,
         upper: i64,
         progress: Option<&ProgressBar>,
@@ -177,7 +202,7 @@ impl IndexSorter {
         }
 
         // Bulk read
-        file.seek(SeekFrom::Start(lower as u64 * ENTRY_SIZE as u64))?;
+        file.seek(SeekFrom::Start(data_offset + lower as u64 * ENTRY_SIZE as u64))?;
         IndexEntry::read_bulk(file, &mut self.buffer, count)?;
 
         if let Some(pb) = progress {
@@ -192,7 +217,7 @@ impl IndexSorter {
         }
 
         // Bulk write back
-        file.seek(SeekFrom::Start(lower as u64 * ENTRY_SIZE as u64))?;
+        file.seek(SeekFrom::Start(data_offset + lower as u64 * ENTRY_SIZE as u64))?;
         IndexEntry::write_bulk(file, &self.buffer, count)?;
 
         self.entries_sorted += count as u64;
@@ -210,6 +235,7 @@ impl IndexSorter {
     fn partition_file(
         &mut self,
         file: &mut File,
+        data_offset: u64,
         lower: i64,
         upper: i64,
         progress: Option<&ProgressBar>,
@@ -217,12 +243,12 @@ impl IndexSorter {
         let pivot_idx = lower + (upper - lower) / 2;
 
         // Read pivot
-        let pivot = read_entry_at(file, pivot_idx)?;
+        let pivot = read_entry_at(file, data_offset, pivot_idx)?;
 
         // Swap pivot to end
-        let tmp = read_entry_at(file, upper)?;
-        write_entry_at(file, upper, &pivot)?;
-        write_entry_at(file, pivot_idx, &tmp)?;
+        let tmp = read_entry_at(file, data_offset, upper)?;
+        write_entry_at(file, data_offset, upper, &pivot)?;
+        write_entry_at(file, data_offset, pivot_idx, &tmp)?;
 
         let partition_size = upper - lower + 1;
         if let Some(pb) = progress {
@@ -238,11 +264,11 @@ impl IndexSorter {
         let mut store_index = lower;
 
         for i in lower..upper {
-            let entry = read_entry_at(file, i)?;
+            let entry = read_entry_at(file, data_offset, i)?;
             if entry.compare(&pivot) == std::cmp::Ordering::Less {
-                let tmp2 = read_entry_at(file, store_index)?;
-                write_entry_at(file, store_index, &entry)?;
-                write_entry_at(file, i, &tmp2)?;
+                let tmp2 = read_entry_at(file, data_offset, store_index)?;
+                write_entry_at(file, data_offset, store_index, &entry)?;
+                write_entry_at(file, data_offset, i, &tmp2)?;
                 store_index += 1;
             }
 
@@ -262,9 +288,9 @@ impl IndexSorter {
         }
 
         // Place pivot at final position
-        let tmp2 = read_entry_at(file, store_index)?;
-        write_entry_at(file, store_index, &pivot)?;
-        write_entry_at(file, upper, &tmp2)?;
+        let tmp2 = read_entry_at(file, data_offset, store_index)?;
+        write_entry_at(file, data_offset, store_index, &pivot)?;
+        write_entry_at(file, data_offset, upper, &tmp2)?;
 
         self.entries_sorted += 1;
 
@@ -282,8 +308,8 @@ fn format_count(n: u64) -> String {
     }
 }
 
-fn read_entry_at(file: &mut File, index: i64) -> Result<IndexEntry> {
-    file.seek(SeekFrom::Start(index as u64 * ENTRY_SIZE as u64))?;
+fn read_entry_at(file: &mut File, data_offset: u64, index: i64) -> Result<IndexEntry> {
+    file.seek(SeekFrom::Start(data_offset + index as u64 * ENTRY_SIZE as u64))?;
     let mut hash_prefix = [0u8; 8];
     let mut position = [0u8; 6];
     file.read_exact(&mut hash_prefix)?;
@@ -294,8 +320,8 @@ fn read_entry_at(file: &mut File, index: i64) -> Result<IndexEntry> {
     })
 }
 
-fn write_entry_at(file: &mut File, index: i64, entry: &IndexEntry) -> Result<()> {
-    file.seek(SeekFrom::Start(index as u64 * ENTRY_SIZE as u64))?;
+fn write_entry_at(file: &mut File, data_offset: u64, index: i64, entry: &IndexEntry) -> Result<()> {
+    file.seek(SeekFrom::Start(data_offset + index as u64 * ENTRY_SIZE as u64))?;
     let hp = entry.hash_prefix;
     let pos = entry.position;
     file.write_all(&hp)?;
