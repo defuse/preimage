@@ -555,3 +555,49 @@ fn test_oracle_batch_survives_poisoned_ntlm_entry() {
         _ => panic!("expected InvalidFormat for \"notahash\""),
     }
 }
+
+/// CrackStation's production REALUNIQ.lst contains an empty line, confirmed on the
+/// live PHP server: sha256("") cracks and returns the empty string. SHA-256 accepts
+/// any byte string, so nothing but the empty word can verify against that hash —
+/// the dictionary really does hold a zero-length word.
+///
+/// Both the builder and the lookup must therefore treat the empty word as ordinary
+/// data. If a future change started dropping empty lines, NTLM("") and sha256("")
+/// would silently stop cracking and diverge from the PHP behavior.
+#[test]
+fn test_empty_word_in_wordlist_cracks_to_empty_plaintext() {
+    use std::io::Write;
+
+    let mut words = NamedTempFile::new().expect("temp file");
+    words.write_all(b"apple\n\nbanana\n").expect("write");
+    words.flush().expect("flush");
+
+    for algorithm in [NTLM, SHA256] {
+        let index_file = NamedTempFile::new().expect("temp file");
+        let index = IndexFile::build(algorithm, words.path(), index_file.path(), None)
+            .expect("build failed");
+        assert_eq!(
+            index.entry_count().expect("entry count"),
+            3,
+            "the empty line must be indexed alongside apple and banana for {}",
+            algorithm.name()
+        );
+        index.sort(1024 * 1024, None).expect("sort failed");
+
+        let table = IndexFile::open(index_file.path())
+            .into_lookup_table(algorithm, words.path())
+            .expect("open");
+
+        let empty_hash = hex::encode(algorithm.hash(b"").expect("hashes the empty string"));
+        let matches = table.lookup(&empty_hash).expect("lookup");
+
+        assert_eq!(
+            matches.len(),
+            1,
+            "{} hash of the empty string should match exactly one word",
+            algorithm.name()
+        );
+        assert_eq!(matches[0].plaintext(), b"", "plaintext must be the empty word");
+        assert!(matches[0].is_full(), "must be a full match, not a prefix match");
+    }
+}
