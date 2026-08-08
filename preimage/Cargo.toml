@@ -1,17 +1,18 @@
 [package]
 name = "preimage"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Hash lookup tables for password cracking"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/defuse/preimage"
 keywords = ["hash", "password", "cracking", "lookup"]
 categories = ["command-line-utilities", "cryptography"]
 authors = ["Taylor Hornby"]
+readme = "README.md"
 default-run = "preimage"
 
 [dependencies]
-allthehashes = { version = "0.1.0", path = "../allthehashes" }
+allthehashes = { version = "0.1.1", path = "../allthehashes" }
 clap = { version = "4", features = ["derive"], optional = true }
 memmap2 = "0.9"
 thiserror = "2"

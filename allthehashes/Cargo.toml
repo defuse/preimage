@@ -1,13 +1,14 @@
 [package]
 name = "allthehashes"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Every hash function in one crate"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/defuse/preimage"
 keywords = ["hash", "cryptography", "md5", "sha256", "digest"]
 categories = ["cryptography", "algorithms"]
 authors = ["Taylor Hornby"]
+readme = "README.md"
 
 [dependencies]
 md2 = "0.10"
