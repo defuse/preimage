@@ -112,7 +112,7 @@ impl IndexBuilder {
 mod tests {
     use super::*;
     use crate::entry::ENTRY_SIZE;
-    use crate::Md5;
+    use crate::{Md5, Ntlm};
     use tempfile::NamedTempFile;
 
     fn test_words_path() -> std::path::PathBuf {
@@ -199,5 +199,39 @@ mod tests {
         let mut expected_prefix = [0u8; 8];
         expected_prefix.copy_from_slice(&expected_hash[..8]);
         assert_eq!(entry0.hash_prefix, expected_prefix);
+    }
+
+    /// Words the algorithm rejects must be omitted from the index entirely, and
+    /// must still advance the wordlist position — otherwise every entry after a
+    /// rejected word points at the wrong offset. This is the CrackStation bug
+    /// where invalid NTLM input was indexed as the hash of the empty string.
+    #[test]
+    fn test_build_skips_words_the_algorithm_rejects() {
+        let mut wordlist = NamedTempFile::new().expect("temp file");
+        use std::io::Write;
+        // 0xFF 0xFE is not valid UTF-8, so NTLM rejects it. 3 bytes with the \n.
+        wordlist.write_all(&[0xFF, 0xFE, b'\n']).expect("write");
+        wordlist.write_all(b"hello\n").expect("write");
+        wordlist.flush().expect("flush");
+
+        let output = NamedTempFile::new().expect("temp file");
+        let count = IndexBuilder::build(&Ntlm, wordlist.path(), output.path(), None)
+            .expect("build failed");
+
+        assert_eq!(count, 1, "the rejected word must not produce an entry");
+
+        let data = std::fs::read(output.path()).expect("read");
+        assert_eq!(data.len(), ENTRY_SIZE, "index must hold exactly one entry");
+
+        let entry = IndexEntry::read_from(&mut &data[..]).expect("read entry");
+
+        // "hello" starts at byte 3, after the 3-byte rejected line. A skip that
+        // forgot to advance the position would leave this at 0.
+        assert_eq!(entry.position(), 3);
+
+        let expected_hash = Ntlm.hash(b"hello").expect("ntlm should hash ascii");
+        let mut expected_prefix = [0u8; 8];
+        expected_prefix.copy_from_slice(&expected_hash[..8]);
+        assert_eq!(entry.hash_prefix, expected_prefix);
     }
 }
