@@ -420,3 +420,138 @@ fn test_duplicate_hash_prefix_collision_block() {
         full.len()
     );
 }
+
+/// CrackStation's production NTLM index was built by PHP versions that had a bug:
+/// when `iconv` rejected a word as invalid UTF-8, `createidx.php` wrote an index
+/// entry for it anyway. Two vintages exist — before defuse/crackstation-hashdb@74a1329
+/// the entry got NTLM("") as its prefix, and between 74a1329 and 3aaf57b (which
+/// announced the skip without a `continue`) it got eight zero bytes.
+///
+/// Either way the entry points at a word NTLM cannot hash. Looking such a hash up
+/// must not panic and must not report the unhashable word as a match — the candidate
+/// simply fails to verify.
+fn write_poisoned_ntlm_index(bogus_prefix: [u8; 8]) -> (NamedTempFile, NamedTempFile) {
+    use std::io::Write;
+
+    // Byte 0: an invalid UTF-8 word. Byte 3: "hello", which NTLM hashes fine.
+    let mut words = NamedTempFile::new().expect("temp file");
+    words.write_all(&[0xFF, 0xFE, b'\n']).expect("write");
+    words.write_all(b"hello\n").expect("write");
+    words.flush().expect("flush");
+
+    // NTLM("hello"), the one legitimate entry.
+    let hello_hash = Ntlm.hash(b"hello").expect("ntlm hashes ascii");
+    let mut hello_prefix = [0u8; 8];
+    hello_prefix.copy_from_slice(&hello_hash[..8]);
+
+    let entry = |prefix: [u8; 8], position: u64| {
+        let mut e = prefix.to_vec();
+        e.extend_from_slice(&position.to_le_bytes()[..6]);
+        e
+    };
+
+    // The index must be sorted by prefix for binary search to find anything.
+    let mut entries = vec![entry(hello_prefix, 3), entry(bogus_prefix, 0)];
+    entries.sort();
+
+    let mut index = NamedTempFile::new().expect("temp file");
+    for e in &entries {
+        index.write_all(e).expect("write");
+    }
+    index.flush().expect("flush");
+
+    (index, words)
+}
+
+#[test]
+fn test_php_ntlm_bug_entry_is_not_reported_as_a_match() {
+    // NTLM("") = 31d6cfe0d16ae931b73c59d7e0c089c0 — also the empty-password hash,
+    // so this is a query real users actually submit.
+    let empty_ntlm = "31d6cfe0d16ae931b73c59d7e0c089c0";
+    let mut bogus = [0u8; 8];
+    bogus.copy_from_slice(&hex::decode(&empty_ntlm[..16]).expect("hex")[..]);
+
+    let (index, words) = write_poisoned_ntlm_index(bogus);
+    let table = IndexFile::open(index.path())
+        .into_lookup_table(NTLM, words.path())
+        .expect("open poisoned index");
+
+    let matches = table.lookup(empty_ntlm).expect("lookup must not error");
+    assert_eq!(
+        matches.len(),
+        0,
+        "the unhashable word must not be reported as a match"
+    );
+
+    // The legitimate entry in the same index still works.
+    let hello_hex = hex::encode(Ntlm.hash(b"hello").expect("hash"));
+    let hello_matches = table.lookup(&hello_hex).expect("lookup");
+    assert_eq!(hello_matches.len(), 1);
+    assert_eq!(hello_matches[0].plaintext(), b"hello");
+    assert!(hello_matches[0].is_full());
+}
+
+#[test]
+fn test_php_ntlm_bug_zero_prefix_vintage_is_not_reported_as_a_match() {
+    let (index, words) = write_poisoned_ntlm_index([0u8; 8]);
+    let table = IndexFile::open(index.path())
+        .into_lookup_table(NTLM, words.path())
+        .expect("open poisoned index");
+
+    let matches = table.lookup("0000000000000000").expect("lookup must not error");
+    assert_eq!(
+        matches.len(),
+        0,
+        "the zero-prefix bug entry must not be reported as a match"
+    );
+}
+
+#[test]
+fn test_oracle_batch_survives_poisoned_ntlm_entry() {
+    let (index, words) = write_poisoned_ntlm_index({
+        let mut b = [0u8; 8];
+        b.copy_from_slice(&hex::decode("31d6cfe0d16ae931").expect("hex")[..]);
+        b
+    });
+
+    let mut oracle = PreimageOracle::new();
+    oracle
+        .register("ntlm", NTLM, index.path(), words.path())
+        .expect("register");
+
+    let hello_hex = hex::encode(Ntlm.hash(b"hello").expect("hash"));
+    let results = oracle
+        .crack(
+            &[
+                hello_hex.as_str(),
+                "31d6cfe0d16ae931b73c59d7e0c089c0",
+                "notahash",
+            ],
+            false,
+        )
+        .expect("crack must not error on a poisoned index");
+
+    assert_eq!(results.len(), 3);
+
+    match &results[0] {
+        HashResult::Lookup { matches, .. } => {
+            assert_eq!(matches.len(), 1);
+            assert_eq!(matches[0].lookup_match.plaintext(), b"hello");
+        }
+        _ => panic!("expected a Lookup for the valid hash"),
+    }
+
+    match &results[1] {
+        HashResult::Lookup { matches, .. } => assert_eq!(
+            matches.len(),
+            0,
+            "poisoned entry must yield no matches, not a bogus plaintext"
+        ),
+        _ => panic!("expected an empty Lookup for the poisoned entry"),
+    }
+
+    match &results[2] {
+        HashResult::InvalidFormat { input } => assert_eq!(input, "notahash"),
+        _ => panic!("expected InvalidFormat for \"notahash\""),
+    }
+}
