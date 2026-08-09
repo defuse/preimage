@@ -133,10 +133,10 @@ non-hex, odd-length, or too-short input, and reserves `Err` for genuine I/O
 failures. A hash that is well-formed but absent comes back as `Lookup` with an
 empty `matches`.
 
-Adding an algorithm means implementing one trait:
+You can index and crack with your own algorithm by implementing one trait:
 
 ```rust
-use preimage::HashAlgorithm;
+use preimage::{HashAlgorithm, IndexFile};
 
 struct MyHash;
 
@@ -146,7 +146,18 @@ impl HashAlgorithm for MyHash {
     }
     fn name(&self) -> &str { "my-hash" }
 }
+
+// Building takes any reference...
+IndexFile::build(&MyHash, wordlist, index_path, None)?;
+
+// ...while looking up stores the algorithm, so it wants a 'static one.
+static MY_HASH: &dyn HashAlgorithm = &MyHash;
+oracle.register("my-hash", MY_HASH, index_path, wordlist)?;
 ```
+
+A custom algorithm does not join any registry: `preimage list` and the `-a` flag
+resolve names through `allthehashes::get_algorithm`, which knows the built-ins
+only. Your type works through the library, not the CLI.
 
 Returning `None` marks input this algorithm cannot represent — that is how LM and
 NTLM skip words outside their encodings, and those words are then absent from the
@@ -162,7 +173,7 @@ committed PHP-generated fixtures rather than trusting the format description.
 ## Development
 
 ```bash
-cargo test --workspace
+cargo test
 ```
 
 Sorting is covered at the boundaries that historically break external sorts —
@@ -187,9 +198,7 @@ licensed as above, without any additional terms or conditions.
 
 This software was written with heavy assistance from AI tools, and **has not yet
 been reviewed by a human**. I intend to review it and will update this notice once I
-have. Until then, weigh that against whatever you are considering using it for — a
-passing test suite is not the same as a read-through by someone who understands the
-consequences of getting this wrong.
+have.
 
 If you would like to submit a PR, using AI is fine, but you must stand by the
 correctness of your submission as strongly as you would if you had written the code

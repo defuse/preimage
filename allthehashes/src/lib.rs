@@ -312,3 +312,44 @@ pub const ALGORITHM_NAMES: &[&str] = &[
     "tiger192,4",
     "whirlpool",
 ];
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+
+    /// `ALGORITHM_NAMES` and the `get_algorithm` match are two separate hardcoded
+    /// lists. If they drift, `preimage list` advertises an algorithm that errors
+    /// out the moment anyone selects it.
+    #[test]
+    fn every_listed_name_resolves() {
+        for name in ALGORITHM_NAMES {
+            let algorithm = get_algorithm(name)
+                .unwrap_or_else(|| panic!("{name} is listed but get_algorithm rejects it"));
+            assert_eq!(
+                algorithm.name(),
+                *name,
+                "{name} resolves to an algorithm that calls itself {:?}",
+                algorithm.name()
+            );
+        }
+    }
+
+    /// The listing must not omit algorithms either, or they become unreachable
+    /// from the CLI despite being implemented.
+    #[test]
+    fn listed_names_are_unique_and_sorted_by_count() {
+        let mut seen: Vec<&str> = ALGORITHM_NAMES.to_vec();
+        let before = seen.len();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(before, seen.len(), "ALGORITHM_NAMES contains duplicates");
+        assert_eq!(before, 58, "expected 58 algorithms, found {before}");
+    }
+
+    #[test]
+    fn unknown_name_is_rejected() {
+        assert!(get_algorithm("definitely-not-a-hash").is_none());
+        assert!(get_algorithm("").is_none());
+        assert!(get_algorithm("MD5").is_none(), "lookup is case-sensitive");
+    }
+}

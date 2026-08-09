@@ -50,7 +50,8 @@ let algorithm = get_algorithm("sha256").expect("sha256 exists");
 assert_eq!(algorithm.name(), "sha256");
 ```
 
-Adding your own is one impl:
+You can implement the trait yourself and pass the result to anything taking a
+`HashAlgorithm`:
 
 ```rust
 use allthehashes::HashAlgorithm;
@@ -64,6 +65,11 @@ impl HashAlgorithm for MyHash {
     fn name(&self) -> &str { "my-hash" }
 }
 ```
+
+There is no registry to add it to. `get_algorithm` and `ALGORITHM_NAMES` cover the
+built-ins only, so your type is reachable through the library but not by name, and
+not from the `preimage` CLI. APIs that store an algorithm want `&'static dyn
+HashAlgorithm`, which a `static MY_HASH: &dyn HashAlgorithm = &MyHash;` satisfies.
 
 ## What's included
 
