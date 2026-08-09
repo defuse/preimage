@@ -1,6 +1,5 @@
 [workspace]
 members = ["allthehashes", "preimage"]
-default-members = ["preimage"]
 resolver = "2"
 
 [profile.release]
