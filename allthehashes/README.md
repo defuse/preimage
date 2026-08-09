@@ -1,5 +1,11 @@
 # allthehashes
 
+> **⚠️ Not for cryptographic use.** This crate deliberately includes insecure
+> hash functions — MD5, SHA-1, LM, NTLM and the checksums are broken by design or
+> by age — and none of the implementations here has had a security review. It is
+> for password cracking and interoperability with old systems. Do not use it to
+> protect anything.
+
 Every hash function in one crate, behind a single trait.
 
 `allthehashes` collects 58 hash and checksum algorithms — the set published on
@@ -73,10 +79,9 @@ impl HashAlgorithm for MyHash {
 Names are the identifiers `get_algorithm` accepts, and they match PHP's `hash()`
 naming so indexes and scripts written against the PHP originals keep working.
 
-Cryptographic primitives come from the [RustCrypto](https://github.com/RustCrypto)
-crates; this crate is the uniform interface over them, not a reimplementation.
-Several of these are long broken — md5, sha1 and the password formats especially —
-and are here for cracking and interoperability, not for protecting anything.
+The standard digests come from the [RustCrypto](https://github.com/RustCrypto)
+crates; this crate is the uniform interface over them. The password formats and
+some checksums are built here on third-party primitives.
 
 ## License
 
