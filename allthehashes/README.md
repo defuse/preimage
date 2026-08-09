@@ -79,13 +79,6 @@ impl HashAlgorithm for MyHash {
 Names are the identifiers `get_algorithm` accepts, and they match PHP's `hash()`
 naming so indexes and scripts written against the PHP originals keep working.
 
-The common digests come from the [RustCrypto](https://github.com/RustCrypto)
-crates, and for those this crate is only a uniform interface. The HAVAL, Snefru
-and Tiger families are not: those 23 are implemented here from scratch. The
-password formats and the FNV and Joaat checksums are also written here, on top
-of third-party primitives. So well over half of the 58 are this crate's own
-code, which is the main reason for the warning at the top.
-
 ## License
 
 Licensed under either of
