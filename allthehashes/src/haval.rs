@@ -1,5 +1,9 @@
 //! HAVAL hash algorithm implementation.
-//! THIS IMPLEMENTATION HAS NOT BEEN AUDITED! DO NOT RELY ON IT FOR SECURITY!
+//!
+//! WARNING: Not for cryptographic use. This crate deliberately includes insecure
+//! hash functions, and none of these implementations has had a security review.
+//! It is for password cracking and interoperability with old systems — do not use
+//! it to protect anything.
 //!
 //! HAVAL is a cryptographic hash function designed by Yuliang Zheng, Josef Pieprzyk,
 //! and Jennifer Seberry in 1992. It supports:

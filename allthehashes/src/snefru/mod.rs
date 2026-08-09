@@ -1,5 +1,10 @@
 //! Snefru hash algorithm implementation.
 //!
+//! WARNING: Not for cryptographic use. This crate deliberately includes insecure
+//! hash functions, and none of these implementations has had a security review.
+//! It is for password cracking and interoperability with old systems — do not use
+//! it to protect anything.
+//!
 //! Snefru is a cryptographic hash function designed by Ralph Merkle in 1990.
 //! This implementation produces a 256-bit (32-byte) digest using 8 rounds,
 //! matching PHP's hash('snefru') and hash('snefru256') output exactly.

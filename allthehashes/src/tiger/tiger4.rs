@@ -1,5 +1,10 @@
 //! Tiger hash algorithm with 4 passes.
 //!
+//! WARNING: Not for cryptographic use. This crate deliberately includes insecure
+//! hash functions, and none of these implementations has had a security review.
+//! It is for password cracking and interoperability with old systems — do not use
+//! it to protect anything.
+//!
 //! This is a custom implementation to match PHP's tiger*,4 variants.
 //! Tiger-4 performs 4 passes (32 rounds) instead of the standard 3 passes (24 rounds).
 

@@ -1,5 +1,10 @@
 //! Tiger hash algorithm implementation.
 //!
+//! WARNING: Not for cryptographic use. This crate deliberately includes insecure
+//! hash functions, and none of these implementations has had a security review.
+//! It is for password cracking and interoperability with old systems — do not use
+//! it to protect anything.
+//!
 //! Tiger is a cryptographic hash function designed by Ross Anderson and Eli Biham
 //! in 1995. It produces a 192-bit hash value and was designed for 64-bit platforms.
 //!

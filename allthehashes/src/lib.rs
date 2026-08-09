@@ -1,5 +1,10 @@
 //! Unified interface for 58 hash algorithms.
 //!
+//! WARNING: Not for cryptographic use. This crate deliberately includes insecure
+//! hash functions, and none of these implementations has had a security review.
+//! It is for password cracking and interoperability with old systems — do not use
+//! it to protect anything.
+//!
 //! This crate provides a common `HashAlgorithm` trait and implementations
 //! for cryptographic hashes, legacy hashes, and non-cryptographic checksums.
 

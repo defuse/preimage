@@ -79,9 +79,12 @@ impl HashAlgorithm for MyHash {
 Names are the identifiers `get_algorithm` accepts, and they match PHP's `hash()`
 naming so indexes and scripts written against the PHP originals keep working.
 
-The standard digests come from the [RustCrypto](https://github.com/RustCrypto)
-crates; this crate is the uniform interface over them. The password formats and
-some checksums are built here on third-party primitives.
+The common digests come from the [RustCrypto](https://github.com/RustCrypto)
+crates, and for those this crate is only a uniform interface. The HAVAL, Snefru
+and Tiger families are not: those 23 are implemented here from scratch. The
+password formats and the FNV and Joaat checksums are also written here, on top
+of third-party primitives. So well over half of the 58 are this crate's own
+code, which is the main reason for the warning at the top.
 
 ## License
 
@@ -101,9 +104,7 @@ licensed as above, without any additional terms or conditions.
 
 This software was written with heavy assistance from AI tools, and **has not yet
 been reviewed by a human**. I intend to review it and will update this notice once I
-have. Until then, weigh that against whatever you are considering using it for — a
-passing test suite is not the same as a read-through by someone who understands the
-consequences of getting this wrong.
+have.
 
 If you would like to submit a PR, using AI is fine, but you must stand by the
 correctness of your submission as strongly as you would if you had written the code

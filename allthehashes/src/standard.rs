@@ -1,3 +1,10 @@
+//! Standard digests, wrapping the RustCrypto implementations.
+//!
+//! WARNING: Not for cryptographic use. This crate deliberately includes insecure
+//! hash functions, and none of these implementations has had a security review.
+//! It is for password cracking and interoperability with old systems — do not use
+//! it to protect anything.
+
 use crate::HashAlgorithm;
 use digest::Digest;
 
