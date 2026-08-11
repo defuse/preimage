@@ -116,23 +116,32 @@ impl IndexBuilder {
 
         writer.flush()?;
 
-        // `position` is the total number of bytes read, counting lines the algorithm
-        // rejected. Reading nothing from a file that metadata said was non-empty means
-        // the input vanished underneath us — it was truncated between the `metadata`
-        // call and the first read. Zero entries from a wordlist that *was* read is a
-        // different and legitimate outcome (an algorithm may reject every word), so it
-        // is deliberately not an error here.
-        if position == 0 && file_len > 0 {
-            bail!(
-                "read 0 bytes from {}, which metadata reported as {} bytes — the wordlist \
-                 was truncated while the index was being built",
-                wordlist_path.display(),
-                file_len
-            );
-        }
+        check_wordlist_was_fully_read(position, file_len, wordlist_path)?;
 
         Ok(entries_written)
     }
+}
+
+/// Fail if the builder read nothing from a wordlist that was not empty.
+///
+/// `bytes_read` counts every byte consumed, including lines the algorithm rejected, so
+/// reading zero from a file whose metadata reported a non-zero length means the input
+/// vanished underneath the builder — it was truncated between the `metadata` call and
+/// the first read, and the index that was just written is silently empty.
+///
+/// This is deliberately keyed on bytes read rather than on entries written: a wordlist
+/// whose every word the algorithm rejects legitimately produces zero entries, and
+/// erroring on that would reject a correct build.
+fn check_wordlist_was_fully_read(bytes_read: u64, file_len: u64, wordlist_path: &Path) -> Result<()> {
+    if bytes_read == 0 && file_len > 0 {
+        bail!(
+            "read 0 bytes from {}, which metadata reported as {} bytes — the wordlist \
+             was truncated while the index was being built",
+            wordlist_path.display(),
+            file_len
+        );
+    }
+    Ok(())
 }
 
 /// Whether two paths lead to the same file on disk.
@@ -273,6 +282,50 @@ mod tests {
             std::fs::read(wordlist.path()).expect("read"),
             b"apple\nbanana\n".to_vec(),
             "the wordlist must be untouched"
+        );
+    }
+
+    /// Reading nothing from a non-empty wordlist means it was truncated mid-build, and
+    /// the index just written is silently empty. That state cannot be produced through
+    /// the public API without racing the builder, so the check is asserted directly.
+    #[test]
+    fn test_truncated_wordlist_is_an_error_but_a_fully_rejected_one_is_not() {
+        let path = Path::new("words.txt");
+
+        let error = check_wordlist_was_fully_read(0, 4096, path)
+            .expect_err("reading 0 bytes from a 4096-byte file must fail");
+        assert_eq!(
+            error.to_string(),
+            "read 0 bytes from words.txt, which metadata reported as 4096 bytes — \
+             the wordlist was truncated while the index was being built"
+        );
+
+        // An empty wordlist read as empty is consistent, not a truncation.
+        check_wordlist_was_fully_read(0, 0, path).expect("an empty wordlist is not an error");
+        // Every byte read, even if every word was rejected and no entry was written.
+        check_wordlist_was_fully_read(4096, 4096, path).expect("a fully read wordlist is fine");
+        check_wordlist_was_fully_read(1, 4096, path)
+            .expect("a partial read is not what this check is for");
+    }
+
+    /// The companion property, through the public API: a wordlist the algorithm rejects
+    /// in its entirety builds a legitimate empty index rather than tripping the guard.
+    /// NTLM rejects non-UTF-8 input, so every line here is skipped.
+    #[test]
+    fn test_wordlist_rejected_in_its_entirety_builds_an_empty_index() {
+        let mut wordlist = NamedTempFile::new().expect("temp file");
+        use std::io::Write;
+        wordlist.write_all(b"\xff\xfe\n\xff\xfe\xfd\n").expect("write");
+        wordlist.flush().expect("flush");
+
+        let output = NamedTempFile::new().expect("temp file");
+        let entries = IndexBuilder::build(&Ntlm, wordlist.path(), output.path(), None)
+            .expect("a fully rejected wordlist must still build");
+
+        assert_eq!(entries, 0);
+        assert_eq!(
+            std::fs::metadata(output.path()).expect("index must exist").len(),
+            0
         );
     }
 
