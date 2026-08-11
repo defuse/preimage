@@ -251,7 +251,21 @@ pub fn get_algorithm(name: &str) -> Option<&'static dyn HashAlgorithm> {
     }
 }
 
-/// Sorted list of all algorithm names.
+/// All algorithm names, in **display order** — the order `preimage list` prints them.
+///
+/// This is a human-readable ordering, not `str`'s byte ordering: `"sha384"` deliberately
+/// precedes `"sha3-224"` even though `'-'` (0x2D) sorts before `'8'` (0x38). Do **not**
+/// run [`slice::binary_search`] over this slice — its precondition does not hold, so the
+/// result is unspecified; today it reports `"sha384"` as absent.
+///
+/// To test whether a name is supported, or to resolve one, use [`get_algorithm`]:
+///
+/// ```
+/// # use allthehashes::{get_algorithm, ALGORITHM_NAMES};
+/// assert!(get_algorithm("sha384").is_some());
+/// assert!(get_algorithm("no-such-hash").is_none());
+/// # assert!(ALGORITHM_NAMES.contains(&"sha384"));
+/// ```
 pub const ALGORITHM_NAMES: &[&str] = &[
     "LM",
     "MySQL4.1+",
@@ -316,6 +330,27 @@ pub const ALGORITHM_NAMES: &[&str] = &[
 #[cfg(test)]
 mod registry_tests {
     use super::*;
+
+    /// `ALGORITHM_NAMES` is in display order on purpose (see its documentation), so this
+    /// asserts the *inversion* is still there. If someone sorts the list to make
+    /// `binary_search` work, this test tells them to fix the search instead.
+    #[test]
+    fn algorithm_names_are_in_display_order_not_byte_order() {
+        let sha384 = ALGORITHM_NAMES
+            .iter()
+            .position(|n| *n == "sha384")
+            .expect("sha384 must be listed");
+        let sha3_224 = ALGORITHM_NAMES
+            .iter()
+            .position(|n| *n == "sha3-224")
+            .expect("sha3-224 must be listed");
+        assert_eq!(
+            sha384 + 1,
+            sha3_224,
+            "sha384 must be displayed before sha3-224"
+        );
+        assert!("sha3-224" < "sha384", "the two orderings must genuinely differ");
+    }
 
     /// `ALGORITHM_NAMES` and the `get_algorithm` match are two separate hardcoded
     /// lists. If they drift, `preimage list` advertises an algorithm that errors
