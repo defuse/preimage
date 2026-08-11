@@ -11,7 +11,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-use preimage::{get_algorithm, HashAlgorithm, IndexFile};
+use preimage::entry::HASH_PREFIX_LEN;
+use preimage::{get_algorithm, HashAlgorithm, IndexFile, LookupMatch};
 
 #[derive(Parser)]
 #[command(
@@ -28,15 +29,15 @@ struct Cli {
     algorithm: String,
 
     /// Lookup threads
-    #[arg(short, long, default_value = "1")]
+    #[arg(short, long, default_value = "1", value_parser = parse_positive_usize)]
     parallel: usize,
 
     /// Lookups per batch for latency tracking
-    #[arg(short, long, default_value = "1000")]
+    #[arg(short, long, default_value = "1000", value_parser = parse_positive_usize)]
     batch: usize,
 
     /// Seconds to run lookup benchmark
-    #[arg(short, long, default_value = "10")]
+    #[arg(short, long, default_value = "10", value_parser = parse_positive_u64)]
     duration: u64,
 
     /// Sort buffer size (e.g. 256M, 4G)
@@ -69,8 +70,36 @@ fn parse_entries(s: &str) -> Result<u64, String> {
         .parse()
         .map_err(|_| format!("invalid number: {num_str:?}"))?;
 
-    num.checked_mul(multiplier)
-        .ok_or_else(|| format!("entry count overflows u64: {s}"))
+    let entries = num
+        .checked_mul(multiplier)
+        .ok_or_else(|| format!("entry count overflows u64: {s}"))?;
+
+    if entries == 0 {
+        return Err("entry count must be at least 1".to_string());
+    }
+    Ok(entries)
+}
+
+fn parse_positive_usize(s: &str) -> Result<usize, String> {
+    let n: usize = s
+        .trim()
+        .parse()
+        .map_err(|_| format!("invalid number: {s:?}"))?;
+    if n == 0 {
+        return Err("must be at least 1".to_string());
+    }
+    Ok(n)
+}
+
+fn parse_positive_u64(s: &str) -> Result<u64, String> {
+    let n: u64 = s
+        .trim()
+        .parse()
+        .map_err(|_| format!("invalid number: {s:?}"))?;
+    if n == 0 {
+        return Err("must be at least 1".to_string());
+    }
+    Ok(n)
 }
 
 fn parse_memory_size(s: &str) -> Result<usize, String> {
@@ -106,6 +135,23 @@ fn main() {
             std::process::exit(1);
         });
 
+    // An index entry stores an 8-byte hash prefix, and `LookupTable::lookup` rejects any
+    // hex string shorter than that. Algorithms with a shorter digest (the 4-byte checksums:
+    // adler32, crc32, crc32b, crc32c, fnv132, fnv1a32, joaat) therefore fail on every single
+    // query, and benchmarking them would measure argument rejection rather than lookups.
+    let digest_len = algorithm
+        .hash(b"sample")
+        .expect("sample input must be hashable")
+        .len();
+    if digest_len < HASH_PREFIX_LEN {
+        eprintln!(
+            "Cannot benchmark {}: its digest is {} bytes, but an index entry stores a \
+             {}-byte prefix, so every lookup would be rejected before doing any work.",
+            cli.algorithm, digest_len, HASH_PREFIX_LEN,
+        );
+        std::process::exit(1);
+    }
+
     println!("=== Configuration ===");
     println!("Algorithm:    {}", cli.algorithm);
     println!("Entries:      {}", format_count(cli.entries));
@@ -116,15 +162,19 @@ fn main() {
 
     fs::create_dir_all(&cli.data_dir).expect("failed to create data directory");
 
-    let wordlist_path = cli
-        .data_dir
-        .join(format!("{}_{}.txt", cli.algorithm, cli.entries));
-    let index_path = cli
-        .data_dir
-        .join(format!("{}_{}.idx", cli.algorithm, cli.entries));
+    // Two of the 58 algorithm names contain a '/' ("sha512/224", "sha512/256"), which
+    // Path::join would read as a directory separator into a directory nothing creates.
+    let slug = filename_slug(&cli.algorithm);
+    let wordlist_path = cli.data_dir.join(format!("{}_{}.txt", slug, cli.entries));
+    let index_path = cli.data_dir.join(format!("{}_{}.idx", slug, cli.entries));
 
     if cli.clean {
-        for path in [&wordlist_path, &index_path] {
+        for path in [
+            &wordlist_path,
+            &index_path,
+            &partial_path(&wordlist_path),
+            &partial_path(&index_path),
+        ] {
             if path.exists() {
                 fs::remove_file(path).expect("failed to remove file");
                 println!("Cleaned:      {}", path.display());
@@ -137,11 +187,12 @@ fn main() {
     // Phase A: Generate wordlist
     generate_wordlist(&wordlist_path, cli.entries);
 
-    // Phase B: Build index
-    let (entry_count, freshly_built) = build_index(algorithm, &wordlist_path, &index_path);
-
-    // Phase C: Sort index (skip check if reusing a previously-sorted index)
-    sort_index(&index_path, entry_count, cli.memory, freshly_built);
+    // Phases B and C: build and sort the index. Both happen at a temporary path and the
+    // result is renamed into place only once it is complete, so a file at `index_path` is
+    // always a fully built, fully sorted index. That is what makes the "exists, skipped"
+    // fast path safe: an interrupted run leaves behind only the partial file, which the
+    // next run overwrites.
+    let entry_count = prepare_index(algorithm, &wordlist_path, &index_path, cli.memory);
 
     println!();
 
@@ -178,6 +229,28 @@ fn progress_bar(total: u64, msg: &str) -> ProgressBar {
     pb
 }
 
+/// Turn an algorithm name into something safe to embed in a filename. Names come from
+/// PHP and are not identifiers: `sha512/224` contains a path separator, `tiger160,3` and
+/// `haval256,5` a comma, `MySQL4.1+` a dot and a plus.
+fn filename_slug(algorithm_name: &str) -> String {
+    algorithm_name
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
+/// The sibling path a file is written to while it is still being produced. Nothing reads
+/// it and the next run overwrites it, so an interrupted run cannot leave behind something
+/// a later run mistakes for finished output.
+fn partial_path(path: &Path) -> PathBuf {
+    let mut name = path
+        .file_name()
+        .expect("generated paths always have a file name")
+        .to_os_string();
+    name.push(".partial");
+    path.with_file_name(name)
+}
+
 fn file_size(path: &Path) -> String {
     let size = fs::metadata(path)
         .expect("failed to read file metadata")
@@ -198,7 +271,8 @@ fn generate_wordlist(path: &Path, entries: u64) {
     let pb = progress_bar(entries, "Generating wordlist");
 
     let start = Instant::now();
-    let file = fs::File::create(path).expect("failed to create wordlist file");
+    let partial = partial_path(path);
+    let file = fs::File::create(&partial).expect("failed to create wordlist file");
     let mut writer = BufWriter::new(file);
 
     for i in 0..entries {
@@ -211,6 +285,9 @@ fn generate_wordlist(path: &Path, entries: u64) {
     drop(writer);
     pb.finish_and_clear();
 
+    // Only now does the wordlist become visible under the name the cache checks for.
+    fs::rename(&partial, path).expect("failed to move the finished wordlist into place");
+
     let elapsed = start.elapsed();
     println!(
         "Wordlist:     {} ({}, {} entries, {:.2}s)",
@@ -221,23 +298,46 @@ fn generate_wordlist(path: &Path, entries: u64) {
     );
 }
 
-/// Returns (entry_count, freshly_built).
-fn build_index(
+/// Build and sort the index, publishing it at `index_path` only once it is complete.
+///
+/// The finished artifact is a *sorted* index, so both phases run against a temporary path
+/// and the result is renamed into place at the end. A file at `index_path` is therefore
+/// never partially built and never unsorted, which is what lets a later run reuse it
+/// without re-checking. Returns the entry count.
+fn prepare_index(
     algorithm: &'static dyn HashAlgorithm,
     wordlist_path: &Path,
     index_path: &Path,
-) -> (u64, bool) {
+    memory_bytes: usize,
+) -> u64 {
     if index_path.exists() {
         let index = IndexFile::open(index_path);
         let count = index.entry_count().expect("failed to read entry count");
         println!(
-            "Index build:  {} ({}, exists, skipped)",
+            "Index build:  {} ({}, {} entries, exists, skipped)",
             index_path.display(),
-            file_size(index_path)
+            file_size(index_path),
+            format_count(count),
         );
-        return (count, false);
+        println!("Sort check:   skipped (a cached index is sorted by construction)");
+        println!("Index sort:   skipped (a cached index is sorted by construction)");
+        return count;
     }
 
+    let partial = partial_path(index_path);
+    let count = build_index(algorithm, wordlist_path, &partial);
+    sort_index(&partial, count, memory_bytes);
+    fs::rename(&partial, index_path).expect("failed to move the finished index into place");
+
+    count
+}
+
+/// Returns the entry count.
+fn build_index(
+    algorithm: &'static dyn HashAlgorithm,
+    wordlist_path: &Path,
+    index_path: &Path,
+) -> u64 {
     let pb = progress_bar(0, "Building index");
 
     let start = Instant::now();
@@ -248,28 +348,20 @@ fn build_index(
 
     let count = index.entry_count().expect("failed to read entry count");
     let secs = elapsed.as_secs_f64();
-    let rate = count as f64 / secs;
-    let per_entry_us = secs * 1_000_000.0 / count as f64;
 
     println!(
-        "Index build:  {:.2}s ({}, {} entries, {:.0} entries/sec, {:.2}us/entry)",
+        "Index build:  {:.2}s ({}, {} entries, {}, {})",
         secs,
         file_size(index_path),
         format_count(count),
-        rate,
-        per_entry_us,
+        format_rate(count, secs),
+        format_per_entry(count, secs),
     );
 
-    (count, true)
+    count
 }
 
-fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_built: bool) {
-    if !freshly_built {
-        println!("Sort check:   skipped (reusing existing index)");
-        println!("Index sort:   skipped (reusing existing index)");
-        return;
-    }
-
+fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize) {
     let check_pb = progress_bar(entry_count, "Checking sort");
     let check_start = Instant::now();
     let index = IndexFile::open(index_path);
@@ -279,15 +371,13 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_
     check_pb.finish_and_clear();
     let check_elapsed = check_start.elapsed();
     let check_secs = check_elapsed.as_secs_f64();
-    let check_rate = entry_count as f64 / check_secs;
-    let check_per_entry_us = check_secs * 1_000_000.0 / entry_count as f64;
 
     println!(
-        "Sort check:   {:.2}s ({} entries, {:.0} entries/sec, {:.2}us/entry)",
+        "Sort check:   {:.2}s ({} entries, {}, {})",
         check_secs,
         format_count(entry_count),
-        check_rate,
-        check_per_entry_us,
+        format_rate(entry_count, check_secs),
+        format_per_entry(entry_count, check_secs),
     );
 
     if sorted {
@@ -312,15 +402,13 @@ fn sort_index(index_path: &Path, entry_count: u64, memory_bytes: usize, freshly_
     let elapsed = start.elapsed();
 
     let secs = elapsed.as_secs_f64();
-    let rate = entry_count as f64 / secs;
-    let per_entry_us = secs * 1_000_000.0 / entry_count as f64;
 
     println!(
-        "Index sort:   {:.2}s ({} entries, {:.0} entries/sec, {:.2}us/entry)",
+        "Index sort:   {:.2}s ({} entries, {}, {})",
         secs,
         format_count(entry_count),
-        rate,
-        per_entry_us,
+        format_rate(entry_count, secs),
+        format_per_entry(entry_count, secs),
     );
 }
 
@@ -381,7 +469,7 @@ fn run_lookup_benchmark(
 
     let wall_start = Instant::now();
 
-    let all_latencies: Vec<Vec<Duration>> = std::thread::scope(|s| {
+    let results: Vec<(Vec<Duration>, Outcomes)> = std::thread::scope(|s| {
         // Timer thread: updates progress bar every 250ms, sets stop flag at end
         let stop_clone = Arc::clone(&stop);
         let query_count_clone = Arc::clone(&query_count);
@@ -415,6 +503,7 @@ fn run_lookup_benchmark(
                 s.spawn(move || {
                     let mut rng = SmallRng::seed_from_u64(42 + thread_id as u64);
                     let mut latencies = Vec::new();
+                    let mut outcomes = Outcomes::default();
 
                     while !stop.load(Ordering::Relaxed) {
                         let batch_start = Instant::now();
@@ -425,13 +514,17 @@ fn run_lookup_benchmark(
                                 entry_count,
                                 hash_hex_len,
                             );
-                            let _ = table.lookup(&hash_hex);
+                            // Consume the result. A discarded Err looks exactly like a
+                            // successful lookup in the timings, which is how a run where
+                            // every single query was rejected could report a throughput
+                            // figure at all.
+                            outcomes.record(table.lookup(&hash_hex));
                         }
                         latencies.push(batch_start.elapsed());
                         query_count.fetch_add(batch as u64, Ordering::Relaxed);
                     }
 
-                    latencies
+                    (latencies, outcomes)
                 })
             })
             .collect();
@@ -445,6 +538,11 @@ fn run_lookup_benchmark(
     pb.finish_and_clear();
 
     let wall_elapsed = wall_start.elapsed();
+    let (all_latencies, per_thread_outcomes): (Vec<Vec<Duration>>, Vec<Outcomes>) =
+        results.into_iter().unzip();
+    let outcomes = per_thread_outcomes
+        .into_iter()
+        .fold(Outcomes::default(), Outcomes::merge);
     let total_batches: usize = all_latencies.iter().map(|v| v.len()).sum();
     let total_lookups = total_batches as u64 * batch as u64;
     let throughput = total_lookups as f64 / wall_elapsed.as_secs_f64();
@@ -458,6 +556,34 @@ fn run_lookup_benchmark(
         format_count(batch as u64),
     );
     println!("Throughput:     {:.0} queries/sec", throughput);
+    println!(
+        "Outcomes:       {} hits, {} misses, {} errors",
+        format_count(outcomes.hits),
+        format_count(outcomes.misses),
+        format_count(outcomes.errors),
+    );
+
+    // A benchmark that measured no lookups is worse than no benchmark, because the
+    // throughput and latency figures above look ordinary either way. Say so loudly.
+    if outcomes.errors > 0 {
+        eprintln!(
+            "\nWARNING: {} of {} lookups returned an error. Those queries did no lookup \
+             work, so the throughput and latency figures above are not measurements of \
+             the index.",
+            format_count(outcomes.errors),
+            format_count(outcomes.total()),
+        );
+    }
+    // generate_lookup_hash aims for a 50/50 split of real hashes and random hex, so a
+    // hit rate far from 50% means the queries are not exercising the intended mix.
+    let hit_rate = outcomes.hit_rate();
+    if outcomes.total() > 0 && !(0.3..=0.7).contains(&hit_rate) {
+        eprintln!(
+            "\nWARNING: hit rate is {:.1}%, but the query generator aims for 50%. The \
+             workload is not the intended half-hit/half-miss mix.",
+            hit_rate * 100.0,
+        );
+    }
 
     // Compute latency stats
     let mut all: Vec<Duration> = all_latencies.into_iter().flatten().collect();
@@ -483,6 +609,64 @@ fn run_lookup_benchmark(
     println!("P99:     {}", format_duration(p99));
 }
 
+/// What the lookups actually did, so the throughput figure can be checked against real
+/// work rather than reported on faith.
+#[derive(Default, Clone, Copy)]
+struct Outcomes {
+    hits: u64,
+    misses: u64,
+    errors: u64,
+}
+
+impl Outcomes {
+    fn record<E>(&mut self, result: Result<Vec<LookupMatch>, E>) {
+        match result {
+            Ok(matches) if matches.is_empty() => self.misses += 1,
+            Ok(_) => self.hits += 1,
+            Err(_) => self.errors += 1,
+        }
+    }
+
+    fn merge(self, other: Self) -> Self {
+        Self {
+            hits: self.hits + other.hits,
+            misses: self.misses + other.misses,
+            errors: self.errors + other.errors,
+        }
+    }
+
+    fn total(&self) -> u64 {
+        self.hits + self.misses + self.errors
+    }
+
+    fn hit_rate(&self) -> f64 {
+        if self.total() == 0 {
+            0.0
+        } else {
+            self.hits as f64 / self.total() as f64
+        }
+    }
+}
+
+/// Entries per second, or `n/a` when there is nothing to divide by. An index can legally
+/// end up empty — every word rejected by the algorithm, for instance — and `inf` in a
+/// results table is worse than an honest blank.
+fn format_rate(count: u64, secs: f64) -> String {
+    if count == 0 || secs <= 0.0 {
+        "n/a entries/sec".to_string()
+    } else {
+        format!("{:.0} entries/sec", count as f64 / secs)
+    }
+}
+
+fn format_per_entry(count: u64, secs: f64) -> String {
+    if count == 0 {
+        "n/a us/entry".to_string()
+    } else {
+        format!("{:.2}us/entry", secs * 1_000_000.0 / count as f64)
+    }
+}
+
 fn format_count(n: u64) -> String {
     let s = n.to_string();
     let mut result = String::with_capacity(s.len() + s.len() / 3);
@@ -503,5 +687,81 @@ fn format_duration(d: Duration) -> String {
         format!("{:.2}ms", us as f64 / 1_000.0)
     } else {
         format!("{:.2}s", us as f64 / 1_000_000.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use preimage::ALGORITHM_NAMES;
+
+    #[test]
+    fn every_algorithm_name_yields_a_single_path_component() {
+        for name in ALGORITHM_NAMES {
+            let path = Path::new("benchmark_data").join(format!("{}_1000.idx", filename_slug(name)));
+            assert_eq!(
+                path.components().count(),
+                2,
+                "{name} produced a nested path: {}",
+                path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn filename_slug_replaces_the_characters_php_names_actually_contain() {
+        assert_eq!(filename_slug("sha512/224"), "sha512_224");
+        assert_eq!(filename_slug("tiger160,3"), "tiger160_3");
+        assert_eq!(filename_slug("haval256,5"), "haval256_5");
+        assert_eq!(filename_slug("MySQL4.1+"), "MySQL4_1_");
+        assert_eq!(filename_slug("md5"), "md5");
+    }
+
+    #[test]
+    fn partial_path_is_a_sibling_of_the_finished_file() {
+        let finished = Path::new("benchmark_data/md5_1000.idx");
+        assert_eq!(
+            partial_path(finished),
+            Path::new("benchmark_data/md5_1000.idx.partial")
+        );
+    }
+
+    #[test]
+    fn zero_valued_arguments_are_rejected() {
+        assert_eq!(parse_entries("0"), Err("entry count must be at least 1".to_string()));
+        assert_eq!(parse_entries("0M"), Err("entry count must be at least 1".to_string()));
+        assert_eq!(parse_positive_usize("0"), Err("must be at least 1".to_string()));
+        assert_eq!(parse_positive_u64("0"), Err("must be at least 1".to_string()));
+
+        assert_eq!(parse_entries("1"), Ok(1));
+        assert_eq!(parse_entries("2M"), Ok(2_000_000));
+        assert_eq!(parse_positive_usize("1000"), Ok(1000));
+        assert_eq!(parse_positive_u64("10"), Ok(10));
+    }
+
+    #[test]
+    fn rates_are_not_infinite_when_there_is_nothing_to_divide_by() {
+        assert_eq!(format_rate(0, 1.5), "n/a entries/sec");
+        assert_eq!(format_per_entry(0, 1.5), "n/a us/entry");
+        assert_eq!(format_rate(1000, 0.0), "n/a entries/sec");
+        assert_eq!(format_rate(1000, 2.0), "500 entries/sec");
+    }
+
+    #[test]
+    fn outcomes_separate_hits_misses_and_errors() {
+        let mut outcomes = Outcomes::default();
+        outcomes.record(Ok::<_, ()>(vec![]));
+        outcomes.record(Err::<Vec<LookupMatch>, _>(()));
+        assert_eq!((outcomes.hits, outcomes.misses, outcomes.errors), (0, 1, 1));
+        assert_eq!(outcomes.total(), 2);
+        assert_eq!(outcomes.hit_rate(), 0.0);
+
+        let merged = outcomes.merge(Outcomes {
+            hits: 2,
+            misses: 0,
+            errors: 0,
+        });
+        assert_eq!((merged.hits, merged.misses, merged.errors), (2, 1, 1));
+        assert_eq!(merged.hit_rate(), 0.5);
     }
 }
