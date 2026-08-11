@@ -7,6 +7,39 @@
 //!
 //! This crate provides a common `HashAlgorithm` trait and implementations
 //! for cryptographic hashes, legacy hashes, and non-cryptographic checksums.
+//!
+//! These implementations have not been audited, and the crate has not yet been
+//! reviewed by a human — it was written with heavy assistance from AI tools. A
+//! passing test suite is not the same as a read-through by someone who understands
+//! the consequences of getting this wrong. It is published under the `cryptography`
+//! category because that is where people look for these algorithms, not because it
+//! is fit for cryptographic use.
+//!
+//! # What is wrapped and what is hand-written
+//!
+//! Roughly half the algorithms delegate to established, separately maintained
+//! crates; the rest are implemented here from scratch. The distinction matters when
+//! you are deciding how much to trust a given digest:
+//!
+//! | Provenance | Algorithms |
+//! | --- | --- |
+//! | Wrapped over RustCrypto and friends | MD2, MD4, MD5, SHA-1, the SHA-2 family, the SHA-3 family, the RIPEMD family, Whirlpool, GOST94, Adler-32, the CRC-32 variants |
+//! | Hand-written in this crate | HAVAL (15 variants), Snefru (2), Tiger (6, including the non-standard 4-pass variants), LM, NTLM, MD5(MD5), MySQL4.1+, QubesV3.1BackupDefaults, the FNV variants, Joaat |
+//!
+//! Every hand-written implementation carries the warning above equally. Where a
+//! module says it "matches PHP's `hash()` output exactly", read that as: it agrees
+//! with PHP on the test vectors committed in that module, which for some algorithms
+//! are the only published vectors that could be found.
+//!
+//! # Algorithms that are not secure regardless of implementation
+//!
+//! Several of these are broken, or were never meant to resist an adversary, and are
+//! provided only for compatibility with existing data:
+//!
+//! - **Checksums, not hashes**: Adler-32, CRC-32/32B/32C, FNV-1/FNV-1a, Joaat. Fast,
+//!   and trivial to collide by construction.
+//! - **Broken or obsolete**: MD2, MD4, MD5, SHA-1, HAVAL, Snefru, LM, NTLM, and the
+//!   compound MD5(MD5) and MySQL4.1+ constructions.
 
 mod checksums;
 mod compound;
