@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use indicatif::ProgressBar;
 
 use super::entry::IndexEntry;
@@ -50,6 +50,17 @@ impl IndexBuilder {
         let wordlist = std::fs::File::open(wordlist_path)?;
         let file_len = wordlist.metadata()?.len();
         let mut reader = BufReader::new(wordlist);
+
+        // `File::create` truncates, and `BufReader::new` has not issued a single read yet,
+        // so if these two paths name the same file the wordlist is destroyed before it is
+        // read and the build then "succeeds" with zero entries. Refuse first.
+        if is_same_file(wordlist_path, output_path) {
+            bail!(
+                "refusing to build: the output and the wordlist are the same file ({}). \
+                 Building would truncate the wordlist before reading it.",
+                output_path.display()
+            );
+        }
 
         let output = std::fs::File::create(output_path)?;
         let mut writer = BufWriter::new(output);
@@ -104,7 +115,48 @@ impl IndexBuilder {
         }
 
         writer.flush()?;
+
+        // `position` is the total number of bytes read, counting lines the algorithm
+        // rejected. Reading nothing from a file that metadata said was non-empty means
+        // the input vanished underneath us — it was truncated between the `metadata`
+        // call and the first read. Zero entries from a wordlist that *was* read is a
+        // different and legitimate outcome (an algorithm may reject every word), so it
+        // is deliberately not an error here.
+        if position == 0 && file_len > 0 {
+            bail!(
+                "read 0 bytes from {}, which metadata reported as {} bytes — the wordlist \
+                 was truncated while the index was being built",
+                wordlist_path.display(),
+                file_len
+            );
+        }
+
         Ok(entries_written)
+    }
+}
+
+/// Whether two paths lead to the same file on disk.
+///
+/// `canonicalize` resolves `.`, `..` and symlinks, so it catches the ordinary aliases
+/// (`words.txt` vs `./words.txt`, or an output symlinked onto the input). On Unix the
+/// device and inode are compared as well, which additionally catches a hard link. The
+/// output normally does not exist yet, and a path that cannot be canonicalized cannot be
+/// an alias of one that can, so failures are answered "not the same file" rather than
+/// propagated.
+fn is_same_file(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let (Ok(a_meta), Ok(b_meta)) = (std::fs::metadata(a), std::fs::metadata(b)) {
+            if a_meta.dev() == b_meta.dev() && a_meta.ino() == b_meta.ino() {
+                return true;
+            }
+        }
+    }
+
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
     }
 }
 
@@ -199,6 +251,61 @@ mod tests {
         let mut expected_prefix = [0u8; 8];
         expected_prefix.copy_from_slice(&expected_hash[..8]);
         assert_eq!(entry0.hash_prefix, expected_prefix);
+    }
+
+    /// Building an index onto its own wordlist truncates the wordlist before a single
+    /// byte has been read, and then reports success with zero entries. Refuse instead.
+    #[test]
+    fn test_build_refuses_to_write_over_its_own_wordlist() {
+        let mut wordlist = NamedTempFile::new().expect("temp file");
+        use std::io::Write;
+        write!(wordlist, "apple\nbanana\n").expect("write");
+        wordlist.flush().expect("flush");
+
+        let error = IndexBuilder::build(&Md5, wordlist.path(), wordlist.path(), None)
+            .expect_err("building onto the wordlist must fail");
+        assert!(
+            error.to_string().contains("the same file"),
+            "unexpected error: {error}"
+        );
+
+        assert_eq!(
+            std::fs::read(wordlist.path()).expect("read"),
+            b"apple\nbanana\n".to_vec(),
+            "the wordlist must be untouched"
+        );
+    }
+
+    /// The alias does not have to be the identical path string: a symlink resolves to the
+    /// same file, and a hard link is the same inode without resolving to the same path.
+    #[cfg(unix)]
+    #[test]
+    fn test_build_refuses_an_output_that_is_a_link_to_the_wordlist() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let wordlist_path = dir.path().join("words.txt");
+        std::fs::write(&wordlist_path, b"apple\nbanana\n").expect("write wordlist");
+
+        let symlinked = dir.path().join("symlinked.idx");
+        std::os::unix::fs::symlink(&wordlist_path, &symlinked).expect("symlink");
+
+        let hardlinked = dir.path().join("hardlinked.idx");
+        std::fs::hard_link(&wordlist_path, &hardlinked).expect("hard link");
+
+        for output_path in [&symlinked, &hardlinked] {
+            let error = IndexBuilder::build(&Md5, &wordlist_path, output_path, None)
+                .expect_err("building onto a link to the wordlist must fail");
+            assert!(
+                error.to_string().contains("the same file"),
+                "unexpected error for {}: {error}",
+                output_path.display()
+            );
+            assert_eq!(
+                std::fs::read(&wordlist_path).expect("read"),
+                b"apple\nbanana\n".to_vec(),
+                "the wordlist must survive {}",
+                output_path.display()
+            );
+        }
     }
 
     /// Words the algorithm rejects must be omitted from the index entirely, and
