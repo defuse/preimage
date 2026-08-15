@@ -15,7 +15,6 @@ default-run = "preimage"
 allthehashes = { version = "0.1.1", path = "../allthehashes" }
 clap = { version = "4", features = ["derive"], optional = true }
 memmap2 = "0.9"
-thiserror = "2"
 anyhow = "1"
 indicatif = "0.17"
 hex = "0.4"

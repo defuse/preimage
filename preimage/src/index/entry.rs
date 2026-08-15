@@ -27,6 +27,24 @@ pub struct IndexEntry {
     pub position: [u8; POSITION_LEN],
 }
 
+// `read_bulk` and `write_bulk` reinterpret a `[IndexEntry]` as `count * ENTRY_SIZE`
+// bytes. That is only sound while the struct is exactly ENTRY_SIZE with no padding:
+// if a field were widened or added, the two would disagree and the bulk helpers would
+// read or write past the entries -- a heap overflow with no compile-time complaint.
+//
+// This was asserted only in a test, which is the wrong place for an invariant that
+// makes `unsafe` sound: a test failure reports it after the fact, whereas this refuses
+// to build. Keep it adjacent to the definition so it is not missed when editing.
+const _: () = assert!(
+    std::mem::size_of::<IndexEntry>() == ENTRY_SIZE,
+    "IndexEntry must be exactly ENTRY_SIZE bytes with no padding -- read_bulk and \
+     write_bulk transmute slices of it to bytes using that assumption"
+);
+const _: () = assert!(
+    std::mem::align_of::<IndexEntry>() == 1,
+    "IndexEntry must be byte-aligned for the bulk byte-slice casts to be sound"
+);
+
 impl IndexEntry {
     /// Create a new index entry. Panics if position >= 2^48.
     pub fn new(hash_prefix: [u8; HASH_PREFIX_LEN], position: u64) -> Self {
