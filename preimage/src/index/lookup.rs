@@ -250,11 +250,9 @@ fn read_word_at(file: &mut File, position: u64) -> Result<Vec<u8>> {
     let mut reader = BufReader::new(file);
     let mut line = Vec::new();
     reader.read_until(b'\n', &mut line)?;
-    // Strip trailing \n and \r, matching PHP's trim($word, "\n\r") in createidx.php
-    while line.last() == Some(&b'\n') || line.last() == Some(&b'\r') {
-        line.pop();
-    }
-    Ok(line)
+    // Must match IndexBuilder::build exactly, or an index fails to verify its own
+    // entries -- see the helper.
+    Ok(crate::index::trim_record_separators(&line).to_vec())
 }
 
 #[cfg(test)]

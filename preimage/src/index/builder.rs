@@ -80,11 +80,8 @@ impl IndexBuilder {
                 break;
             }
 
-            // Strip trailing \n and \r, matching PHP's trim($word, "\n\r")
-            let mut word = &line_buf[..];
-            while word.last() == Some(&b'\n') || word.last() == Some(&b'\r') {
-                word = &word[..word.len() - 1];
-            }
+            // Both ends, matching PHP's trim($word, "\n\r") -- see the helper.
+            let word = super::trim_record_separators(&line_buf);
 
             let hash = match algorithm.hash(word) {
                 Some(h) => h,
@@ -260,6 +257,49 @@ mod tests {
         let mut expected_prefix = [0u8; 8];
         expected_prefix.copy_from_slice(&expected_hash[..8]);
         assert_eq!(entry0.hash_prefix, expected_prefix);
+    }
+
+    /// A line beginning with `\r` must be indexed as the word without it, the way
+    /// createidx.php's two-sided `trim($word, "\n\r")` does. The builder hashes the
+    /// trimmed word, so this asserts on the digest actually written to the index --
+    /// with the old one-sided trim it was MD5("\rletmein") and the word was
+    /// unreachable through a Rust-built index.
+    #[test]
+    fn test_leading_carriage_return_is_stripped_like_php_trim() {
+        let mut wordlist = NamedTempFile::new().expect("temp file");
+        use std::io::Write;
+        // Line 2 begins with \r; line 3 has leading spaces that must survive.
+        wordlist
+            .write_all(b"apple\n\rletmein\n  spaced  \n")
+            .expect("write");
+        wordlist.flush().expect("flush");
+
+        let output = NamedTempFile::new().expect("temp file");
+        let entries = IndexBuilder::build(&Md5, wordlist.path(), output.path(), None)
+            .expect("build must succeed");
+        assert_eq!(entries, 3);
+
+        let index = std::fs::read(output.path()).expect("read index");
+        let prefix_at = |n: usize| index[n * ENTRY_SIZE..n * ENTRY_SIZE + 8].to_vec();
+
+        let expect = |word: &str| Md5.hash(word.as_bytes()).expect("md5")[..8].to_vec();
+
+        assert_eq!(prefix_at(0), expect("apple"));
+        assert_eq!(
+            prefix_at(1),
+            expect("letmein"),
+            "a leading \\r must be stripped, matching createidx.php"
+        );
+        assert_ne!(
+            prefix_at(1),
+            expect("\rletmein"),
+            "the untrimmed form must not be what got indexed"
+        );
+        assert_eq!(
+            prefix_at(2),
+            expect("  spaced  "),
+            "spaces are password bytes and must survive the trim"
+        );
     }
 
     /// Building an index onto its own wordlist truncates the wordlist before a single
