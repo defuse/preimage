@@ -54,16 +54,51 @@ fn fingerprint(entries: &[IndexEntry]) -> HashMap<([u8; 8], u64), usize> {
 }
 
 /// Sort with 1 MiB buffer, verify sorted, and return the sorted entries.
+/// Sort `entries` and return the result, exercising *both* sorter code paths.
+///
+/// Which path runs is decided purely by the memory budget: `buf_count` is
+/// `memory_bytes / ENTRY_SIZE`, a partition of `size <= buf_count` becomes one
+/// `sort_unstable_by`, and anything larger goes through the hand-written file-based
+/// Lomuto quicksort. Every input in this file fits comfortably inside the 1 MiB this
+/// helper used to hard-code, so none of these tests ever reached `partition_file` --
+/// the path the file is named for and the one carrying the real complexity.
+///
+/// Run each input at three budgets and require byte-identical output:
+///   1 MiB           -- in-memory, one sort_unstable_by
+///   10 entries      -- multi-level file partitioning
+///   0               -- every partition on the file path
+///
+/// Disagreement between them is itself the bug worth catching.
 fn sort_and_verify(entries: &[IndexEntry]) -> Vec<IndexEntry> {
+    let mut results: Vec<(usize, Vec<u8>)> = Vec::new();
+
+    for memory_bytes in [1024 * 1024, 10 * ENTRY_SIZE, 0] {
+        let f = write_entries(entries);
+        let index = IndexFile::open(f.path());
+        index
+            .sort(memory_bytes, None)
+            .unwrap_or_else(|e| panic!("sort failed at budget {memory_bytes}: {e}"));
+
+        assert!(
+            index.check_sorted(None).expect("check failed"),
+            "index should be sorted at budget {memory_bytes}"
+        );
+
+        results.push((memory_bytes, std::fs::read(f.path()).expect("read sorted file")));
+    }
+
+    for window in results.windows(2) {
+        let (budget_a, bytes_a) = &window[0];
+        let (budget_b, bytes_b) = &window[1];
+        assert_eq!(
+            bytes_a, bytes_b,
+            "sorting the same input at budget {budget_a} and {budget_b} produced \
+             different files -- the in-memory and file-based paths disagree"
+        );
+    }
+
     let f = write_entries(entries);
-    let index = IndexFile::open(f.path());
-    index.sort(1024 * 1024, None).expect("sort failed");
-
-    assert!(
-        index.check_sorted(None).expect("check failed"),
-        "index should be sorted"
-    );
-
+    std::fs::write(f.path(), &results[0].1).expect("write");
     read_all_entries(f.path())
 }
 

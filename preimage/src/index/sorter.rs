@@ -91,8 +91,23 @@ impl IndexSorter {
             return Ok(());
         }
 
-        // Grow buffer to fit the entire file
-        let count = num_entries as usize;
+        // Grow buffer to fit the entire file.
+        //
+        // `num_entries as usize` silently truncates where usize is 32 bits, so an
+        // index of more than 2^32 entries -- 56 GiB, which is the scale this tool is
+        // for -- would allocate a buffer for `num_entries mod 2^32`, sort that prefix,
+        // and report success on a file that is still unsorted past it. Every
+        // downstream check would pass: the size is still a multiple of ENTRY_SIZE and
+        // check_sorted is not wired into any runtime path. Refuse instead.
+        let count = usize::try_from(num_entries).unwrap_or_else(|_| {
+            panic!(
+                "index holds {num_entries} entries, which does not fit in this \
+                 platform's usize ({} bits). Sorting it here would silently sort only \
+                 the first {} entries and report success. Use a 64-bit build.",
+                usize::BITS,
+                usize::MAX,
+            )
+        });
         if self.buffer.len() < count {
             self.buffer.resize(count, IndexEntry::new([0; 8], 0));
         }

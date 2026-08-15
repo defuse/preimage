@@ -181,9 +181,15 @@ Both binaries are behind features — `preimage` behind `cli`, `benchmark` behin
 `bench` — so a plain `cargo test` does not compile them and silently skips their
 tests. Use `--all-features` to run the whole suite.
 
-Sorting is covered at the boundaries that historically break external sorts —
-exactly at buffer capacity, one under, one over, and multiples of it, plus
-already-sorted, reverse-sorted, and all-identical inputs.
+Sorting is covered at the buffer-capacity boundaries — exactly at capacity, one
+under, one over, and multiples of it — plus already-sorted, reverse-sorted and
+all-identical inputs. Every case runs at three memory budgets, so each one is
+sorted both entirely in memory and entirely through the file-based quicksort,
+and the two are required to produce byte-identical files.
+
+Note that sorted and reverse-sorted input is not the adversarial case for *this*
+sorter: with a middle-element pivot they are its best case. The input that
+degenerates it is one where every key compares equal.
 
 ## License
 
