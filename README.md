@@ -173,8 +173,13 @@ committed PHP-generated fixtures rather than trusting the format description.
 ## Development
 
 ```bash
-cargo test
+cargo test                 # the two libraries
+cargo test --all-features  # everything, including the CLI and benchmark binaries
 ```
+
+Both binaries are behind features — `preimage` behind `cli`, `benchmark` behind
+`bench` — so a plain `cargo test` does not compile them and silently skips their
+tests. Use `--all-features` to run the whole suite.
 
 Sorting is covered at the boundaries that historically break external sorts —
 exactly at buffer capacity, one under, one over, and multiples of it, plus
