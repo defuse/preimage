@@ -32,12 +32,21 @@ impl HashAlgorithm for Adler32 {
 // CRC-32 variants
 // =============================================================================
 
-/// CRC-32 - PHP's hash('crc32') uses CRC-32/BZIP2 (non-reflected), output in big-endian
+/// CRC-32 - PHP's `hash('crc32')` uses CRC-32/BZIP2 (non-reflected), output in
+/// **little-endian**.
+///
+/// This is the odd one out: PHP finalizes `crc32` with `PHP_CRC32LEFinal`, which
+/// writes the value least-significant byte first, while `crc32b` and `crc32c` use
+/// `PHP_CRC32BEFinal` and come out big-endian. That is what the `swap_bytes()` below
+/// is for, and why it is not redundant next to `to_be_bytes()`: together they are the
+/// little-endian serialization of a big-endian-computed CRC. Removing it would break
+/// PHP compatibility, and the three `Crc32` test vectors would catch that.
 pub struct Crc32;
 
 impl HashAlgorithm for Crc32 {
     fn hash(&self, input: &[u8]) -> Option<Vec<u8>> {
         let crc = Crc::<u32>::new(&CRC_32_BZIP2);
+        // swap_bytes + to_be_bytes == little-endian serialization. See the type docs.
         let checksum = crc.checksum(input).swap_bytes();
         Some(checksum.to_be_bytes().to_vec())
     }
@@ -47,7 +56,8 @@ impl HashAlgorithm for Crc32 {
     }
 }
 
-/// CRC-32B - PHP's hash('crc32b') uses CRC-32/ISO-HDLC (reflected, same as zlib)
+/// CRC-32B - PHP's `hash('crc32b')` uses CRC-32/ISO-HDLC (reflected, same as zlib),
+/// output in big-endian -- unlike `crc32` above, which is little-endian.
 pub struct Crc32b;
 
 impl HashAlgorithm for Crc32b {
