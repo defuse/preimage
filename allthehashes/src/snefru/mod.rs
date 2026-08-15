@@ -37,6 +37,33 @@ struct SnefruContext {
     buffer_len: usize,
 }
 
+/// Add `byte_len` bytes' worth of bits to the 64-bit message-length counter.
+///
+/// `count[0]` is the high word and `count[1]` the low word: `finalize` writes them
+/// into `state[14]` and `state[15]`, which is the 64-bit message-length field Snefru's
+/// final block encodes. Merkle-Damgård strengthening only works if that field is the
+/// true bit length, so both halves have to be maintained.
+///
+/// `byte_len * 8` is a 64-bit quantity. Its low 32 bits go in the low word, and the
+/// three bits the shift pushes past a 32-bit word — everything at or above 2^29 bytes
+/// — belong in the high word. The high term used to be missing entirely, and the only
+/// carry performed was the one out of the *accumulation*, which cannot recover bits
+/// already discarded by the multiplication. The length field therefore wrapped every
+/// 512 MiB, so a 512 MiB input hashed as though it were zero-length. HAVAL, in this
+/// same crate, carries it correctly; this is the line Snefru was missing.
+fn add_bit_length(count: &mut [u32; 2], byte_len: usize) {
+    // Widen before shifting: `(byte_len as u32) << 3` would truncate to 32 bits first
+    // and lose the high bits of any input above 4 GiB.
+    let bit_len_low = ((byte_len as u64) << 3) as u32;
+
+    let (low, overflow) = count[1].overflowing_add(bit_len_low);
+    count[1] = low;
+    if overflow {
+        count[0] = count[0].wrapping_add(1);
+    }
+    count[0] = count[0].wrapping_add((byte_len >> 29) as u32);
+}
+
 impl SnefruContext {
     fn new() -> Self {
         Self {
@@ -48,13 +75,7 @@ impl SnefruContext {
     }
 
     fn update(&mut self, data: &[u8]) {
-        // Update bit count
-        let bit_len = (data.len() as u32).wrapping_mul(8);
-        let (new_low, overflow) = self.count[1].overflowing_add(bit_len);
-        self.count[1] = new_low;
-        if overflow {
-            self.count[0] = self.count[0].wrapping_add(1);
-        }
+        add_bit_length(&mut self.count, data.len());
 
         let mut offset = 0;
 
@@ -297,5 +318,65 @@ mod tests {
             hex::encode(snefru256(&[0xFFu8; 128])),
             "991622122962717b822e08653b1f4fbae53fa7a3eb3583ba423b6782b4d05881"
         );
+    }
+}
+
+#[cfg(test)]
+mod bit_length_tests {
+    use super::add_bit_length;
+
+    /// The counter must encode the true 64-bit message length. The high word used to
+    /// be left at zero for any single update, so the field wrapped every 512 MiB and a
+    /// 512 MiB message was indistinguishable from an empty one -- a Merkle-Damgård
+    /// length-extension footgun, and a digest that disagrees with every other Snefru.
+    ///
+    /// Asserted on the counter rather than on a digest because reproducing it end to
+    /// end means hashing half a gigabyte through a deliberately slow function.
+    #[test]
+    fn high_word_carries_above_512_mib() {
+        let mut count = [0u32; 2];
+        add_bit_length(&mut count, 1 << 29); // 512 MiB
+        assert_eq!(count, [1, 0], "2^29 bytes is exactly 2^32 bits: high 1, low 0");
+
+        let mut count = [0u32; 2];
+        add_bit_length(&mut count, (1 << 29) - 1);
+        assert_eq!(count, [0, 0xFFFF_FFF8], "one byte short must not carry");
+
+        let mut count = [0u32; 2];
+        add_bit_length(&mut count, 1 << 30);
+        assert_eq!(count, [2, 0]);
+    }
+
+    /// Above 4 GiB the length must not be truncated to 32 bits before the shift.
+    #[test]
+    fn lengths_above_four_gib_are_not_truncated() {
+        let mut count = [0u32; 2];
+        add_bit_length(&mut count, 1usize << 32);
+        assert_eq!(count, [8, 0], "2^32 bytes is 2^35 bits");
+
+        // A length whose low 32 bits are zero must still register in the high word;
+        // truncating first would have recorded nothing at all.
+        let mut count = [0u32; 2];
+        add_bit_length(&mut count, 1usize << 35);
+        assert_eq!(count, [1 << 6, 0]);
+    }
+
+    #[test]
+    fn small_lengths_are_unchanged() {
+        for (bytes, expected_low) in [(0usize, 0u32), (1, 8), (55, 440), (64, 512)] {
+            let mut count = [0u32; 2];
+            add_bit_length(&mut count, bytes);
+            assert_eq!(count, [0, expected_low], "{bytes} bytes");
+        }
+    }
+
+    /// Repeated updates accumulate, and a carry out of the low word reaches the high
+    /// word -- the one carry the old code did perform.
+    #[test]
+    fn accumulation_carries_between_words() {
+        let mut count = [0u32; 2];
+        add_bit_length(&mut count, (1 << 29) - 1); // low = 0xFFFF_FFF8
+        add_bit_length(&mut count, 1); // +8 bits -> wraps to 0
+        assert_eq!(count, [1, 0]);
     }
 }
