@@ -44,24 +44,47 @@ struct SnefruContext {
 /// final block encodes. Merkle-Damgård strengthening only works if that field is the
 /// true bit length, so both halves have to be maintained.
 ///
-/// `byte_len * 8` is a 64-bit quantity. Its low 32 bits go in the low word, and the
-/// three bits the shift pushes past a 32-bit word — everything at or above 2^29 bytes
-/// — belong in the high word. The high term used to be missing entirely, and the only
-/// carry performed was the one out of the *accumulation*, which cannot recover bits
-/// already discarded by the multiplication. The length field therefore wrapped every
-/// 512 MiB, so a 512 MiB input hashed as though it were zero-length. HAVAL, in this
-/// same crate, carries it correctly; this is the line Snefru was missing.
+/// This reproduces the reference implementation's arithmetic **including its
+/// off-by-one**, deliberately. Read on before "fixing" it.
+///
+/// The original code did neither of the two defensible things: it dropped the carry
+/// entirely, so the length field wrapped every 512 MiB and a 512 MiB message hashed
+/// exactly as an empty one. That was wrong under every reading, and is what this
+/// replaces.
+///
+/// The reference — Merkle's `Increment64BitCounter`, preserved verbatim in
+/// brandondahler/retter's `Snefru/snefru.c:1385-1404` and reproduced in PHP's
+/// `ext/hash/hash_snefru.c:140-145` — computes the headroom before a wrap as
+/// `0xFFFFFFFF - count[1]` when it is really `0x100000000 - count[1]`. So every carry
+/// lands one too high: 2^29 bytes is 2^32 bits, which should encode as `[1, 0]`, and
+/// both the reference and PHP produce `[1, 1]`.
+///
+/// That is not a bug this crate gets to correct. `hash('snefru')` is the thing being
+/// interoperated with, and the digests it emits above 512 MiB are what real data was
+/// hashed with; a "corrected" length field would agree with nobody. Verified against
+/// PHP 8.4.23: transcribing this arithmetic reproduces its 512 MiB digest byte for
+/// byte, and correcting the off-by-one does not.
+///
+/// `count[0]` is the high word and `count[1]` the low word: `finalize` writes them
+/// into `state[14]` and `state[15]`, which is the 64-bit length field the final block
+/// encodes.
 fn add_bit_length(count: &mut [u32; 2], byte_len: usize) {
-    // Widen before shifting: `(byte_len as u32) << 3` would truncate to 32 bits first
-    // and lose the high bits of any input above 4 GiB.
-    let bit_len_low = ((byte_len as u64) << 3) as u32;
+    /// `maxInt` in the reference, `MAX32` in PHP.
+    const MAX32: u64 = 0xFFFF_FFFF;
 
-    let (low, overflow) = count[1].overflowing_add(bit_len_low);
-    count[1] = low;
-    if overflow {
+    // The comparison is made in full width -- PHP's `len` is a size_t, so `len * 8`
+    // does not truncate here even though the assignments below do.
+    let increment = byte_len as u64 * 8;
+
+    if MAX32 - (count[1] as u64) < increment {
         count[0] = count[0].wrapping_add(1);
+        // Reference: counter[1] = maxInt - counter[1]; counter[1] = increment - counter[1];
+        // The first line is the off-by-one -- it is 0xFFFFFFFF, not 0x100000000.
+        count[1] = (MAX32 as u32).wrapping_sub(count[1]);
+        count[1] = (byte_len as u32).wrapping_mul(8).wrapping_sub(count[1]);
+    } else {
+        count[1] = count[1].wrapping_add((byte_len as u32).wrapping_mul(8));
     }
-    count[0] = count[0].wrapping_add((byte_len >> 29) as u32);
 }
 
 impl SnefruContext {
@@ -325,58 +348,46 @@ mod tests {
 mod bit_length_tests {
     use super::add_bit_length;
 
-    /// The counter must encode the true 64-bit message length. The high word used to
-    /// be left at zero for any single update, so the field wrapped every 512 MiB and a
-    /// 512 MiB message was indistinguishable from an empty one -- a Merkle-Damgård
-    /// length-extension footgun, and a digest that disagrees with every other Snefru.
+    /// The reference implementation carries one too high, and this must match it.
     ///
-    /// Asserted on the counter rather than on a digest because reproducing it end to
-    /// end means hashing half a gigabyte through a deliberately slow function.
+    /// 2^29 bytes is exactly 2^32 bits, which a correct 64-bit counter encodes as
+    /// [1, 0]. Merkle's Increment64BitCounter computes the headroom as
+    /// `0xFFFFFFFF - count[1]` rather than `0x100000000 - count[1]`, so it produces
+    /// [1, 1] -- and PHP reproduces that verbatim. Confirmed against PHP 8.4.23.
     #[test]
-    fn high_word_carries_above_512_mib() {
+    fn carry_reproduces_the_reference_off_by_one() {
         let mut count = [0u32; 2];
-        add_bit_length(&mut count, 1 << 29); // 512 MiB
-        assert_eq!(count, [1, 0], "2^29 bytes is exactly 2^32 bits: high 1, low 0");
+        add_bit_length(&mut count, 1 << 29);
+        assert_eq!(
+            count,
+            [1, 1],
+            "must match the reference's off-by-one, not the arithmetically correct [1, 0]"
+        );
 
+        // One byte short of the boundary does not carry, so it is unaffected.
         let mut count = [0u32; 2];
         add_bit_length(&mut count, (1 << 29) - 1);
-        assert_eq!(count, [0, 0xFFFF_FFF8], "one byte short must not carry");
-
-        let mut count = [0u32; 2];
-        add_bit_length(&mut count, 1 << 30);
-        assert_eq!(count, [2, 0]);
+        assert_eq!(count, [0, 0xFFFF_FFF8]);
     }
 
-    /// Above 4 GiB the length must not be truncated to 32 bits before the shift.
+    /// Every carry is off by one, including one reached by accumulation rather than
+    /// by a single oversized update.
     #[test]
-    fn lengths_above_four_gib_are_not_truncated() {
+    fn accumulated_carry_is_off_by_one_too() {
         let mut count = [0u32; 2];
-        add_bit_length(&mut count, 1usize << 32);
-        assert_eq!(count, [8, 0], "2^32 bytes is 2^35 bits");
-
-        // A length whose low 32 bits are zero must still register in the high word;
-        // truncating first would have recorded nothing at all.
-        let mut count = [0u32; 2];
-        add_bit_length(&mut count, 1usize << 35);
-        assert_eq!(count, [1 << 6, 0]);
+        add_bit_length(&mut count, (1 << 29) - 1); // low = 0xFFFF_FFF8
+        add_bit_length(&mut count, 1); // +8 bits: wraps
+        assert_eq!(count, [1, 1], "arithmetically this is [1, 0]");
     }
 
+    /// Below the carry threshold the counter is exact, which is every input any
+    /// caller of this crate will realistically produce.
     #[test]
-    fn small_lengths_are_unchanged() {
-        for (bytes, expected_low) in [(0usize, 0u32), (1, 8), (55, 440), (64, 512)] {
+    fn small_lengths_are_exact() {
+        for (bytes, expected_low) in [(0usize, 0u32), (1, 8), (55, 440), (64, 512), (1000, 8000)] {
             let mut count = [0u32; 2];
             add_bit_length(&mut count, bytes);
             assert_eq!(count, [0, expected_low], "{bytes} bytes");
         }
-    }
-
-    /// Repeated updates accumulate, and a carry out of the low word reaches the high
-    /// word -- the one carry the old code did perform.
-    #[test]
-    fn accumulation_carries_between_words() {
-        let mut count = [0u32; 2];
-        add_bit_length(&mut count, (1 << 29) - 1); // low = 0xFFFF_FFF8
-        add_bit_length(&mut count, 1); // +8 bits -> wraps to 0
-        assert_eq!(count, [1, 0]);
     }
 }
