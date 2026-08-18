@@ -17,14 +17,26 @@ fn test_words_path() -> PathBuf {
     test_data_path().join("words.txt")
 }
 
+/// Lines in `tests/test_data/words.txt`. Every algorithm tested here accepts all of
+/// them, so a build must write exactly this many entries -- the count is deterministic,
+/// so the assertions may as well be exact.
+const WORDS_IN_FIXTURE: u64 = 224;
+
+/// Entries in the `ZzZz` collision block of the committed PHP-built indexes.
+const ZZZZ_COLLISION_BLOCK: usize = 216;
+
 fn build_sort_verify(algorithm: &dyn HashAlgorithm) -> NamedTempFile {
     let words = test_words_path();
     let temp = NamedTempFile::new().expect("temp file");
 
     let index = IndexFile::build(algorithm, &words, temp.path(), None).expect("build failed");
-    assert!(
-        index.entry_count().expect("entry count") > 0,
-        "should create at least one entry for {}",
+    assert_eq!(
+        index.entry_count().expect("entry count"),
+        WORDS_IN_FIXTURE,
+        "{} must index every word in the fixture. This was `> 0`, which passes on an \
+         index truncated to a single entry -- and a build interrupted mid-write leaves \
+         exactly that: an entry-aligned file IndexFile::open accepts and check_sorted \
+         calls sorted, because a prefix of a sorted sequence is sorted.",
         algorithm.name()
     );
 
@@ -118,10 +130,12 @@ fn test_crack_against_php_md5_index() {
         .lookup("0ad6b8c945189cf69fbb9850c4f8aa37")
         .expect("lookup");
     let plaintexts = full_match_plaintexts(&matches);
-    assert!(
-        plaintexts.len() >= 200,
-        "should crack many 'ZzZz' entries from PHP md5 index (got {})",
-        plaintexts.len()
+    assert_eq!(
+        plaintexts.len(),
+        ZZZZ_COLLISION_BLOCK,
+        "the whole 'ZzZz' collision block must come back from the PHP md5 index. This was \
+         `>= 200`, which tolerates losing up to sixteen entries -- exactly the silent \
+         partial walk a truncated index or a dropped candidate produces."
     );
     assert!(
         plaintexts.iter().all(|p| *p == b"ZzZz"),
@@ -414,10 +428,11 @@ fn test_duplicate_hash_prefix_collision_block() {
     let zzzz_hash = hex::encode(Md5.hash(b"ZzZz").expect("hash"));
     let matches = table.lookup(&zzzz_hash).expect("lookup");
     let full: Vec<_> = matches.iter().filter(|m| m.is_full()).collect();
-    assert!(
-        full.len() >= 200,
-        "should find many full matches for repeated 'ZzZz' (got {})",
-        full.len()
+    assert_eq!(
+        full.len(),
+        ZZZZ_COLLISION_BLOCK,
+        "the whole 'ZzZz' collision block must come back. This was `>= 200`, which \
+         tolerates losing up to sixteen entries."
     );
 }
 
