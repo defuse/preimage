@@ -1,6 +1,11 @@
 /target/
 *.idx
-!tests/test_data/*.idx
+# The fixtures live in the preimage crate, one level down. A pattern containing a
+# "/" is anchored to the directory holding this .gitignore, so the old
+# "!tests/test_data/*.idx" only ever matched a top-level tests/ directory that does
+# not exist -- any newly added fixture was silently ignored. The committed ones
+# survived only because git had already tracked them.
+!preimage/tests/test_data/*.idx
 benchmark_data/
 flamegraph.svg
 perf.data
