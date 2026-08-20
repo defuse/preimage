@@ -1,6 +1,6 @@
 [package]
 name = "preimage"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Hash lookup tables for password cracking"
 license = "MIT OR Apache-2.0"
