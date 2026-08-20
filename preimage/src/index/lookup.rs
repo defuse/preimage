@@ -88,6 +88,32 @@ pub struct LookupTable {
     entry_count: u64,
 }
 
+/// The result of a collision-block walk: what was kept, and what was there.
+///
+/// `matches.len()` is what the caller got; `total_matches` is what the block held. They
+/// differ only when a limit was applied and the block was larger than it, which is the
+/// signal a caller needs to say so rather than silently presenting a subset as the whole
+/// answer.
+#[derive(Default)]
+pub struct LookupOutcome {
+    /// Matches retained, at most the requested limit. Full matches come first.
+    pub matches: Vec<LookupMatch>,
+    /// How many matches the block held in total, whether or not they were retained.
+    pub total_matches: usize,
+}
+
+impl LookupOutcome {
+    /// How many matches were dropped to satisfy the limit.
+    pub fn dropped(&self) -> usize {
+        self.total_matches.saturating_sub(self.matches.len())
+    }
+
+    /// Whether the limit actually bit.
+    pub fn is_truncated(&self) -> bool {
+        self.dropped() > 0
+    }
+}
+
 impl LookupTable {
     /// Open a lookup table.
     ///
@@ -128,12 +154,33 @@ impl LookupTable {
         self.algorithm
     }
 
-    /// Look up a hex-encoded hash. Returns all prefix matches.
+    /// Look up a hex-encoded hash. Returns every prefix match, unbounded.
+    ///
+    /// Equivalent to `lookup_limited(hash_hex, usize::MAX)` with the count discarded.
+    /// Prefer `lookup_limited` where the caller renders or buffers the result: a
+    /// collision block is as large as the wordlist makes it, and every entry in it
+    /// becomes a retained match.
     pub fn lookup(&self, hash_hex: &str) -> Result<Vec<LookupMatch>> {
+        Ok(self.lookup_limited(hash_hex, usize::MAX)?.matches)
+    }
+
+    /// Look up a hex-encoded hash, keeping at most `limit` matches.
+    ///
+    /// The whole collision block is still walked — `total_matches` is the true count,
+    /// which is the number a caller needs to tell a user that what they are looking at
+    /// is a subset. What the limit bounds is what is *retained*: the heap the matches
+    /// occupy and, downstream, the size of whatever is rendered from them.
+    ///
+    /// **Full matches are kept in preference to partial ones.** A cap applied in index
+    /// order would be a correctness bug, not just a display one: the exact match can
+    /// sit anywhere in the block, so dropping the tail could turn a correct answer into
+    /// a confident "not found". Ordering full matches first also happens to put the
+    /// answer where a reader looks for it.
+    pub fn lookup_limited(&self, hash_hex: &str, limit: usize) -> Result<LookupOutcome> {
         let hash_bytes = parse_hash_hex(hash_hex)?;
 
         if self.entry_count == 0 {
-            return Ok(Vec::new());
+            return Ok(LookupOutcome::default());
         }
 
         // Extract the 8-byte search prefix
@@ -145,7 +192,7 @@ impl LookupTable {
         let find = self.binary_search(&search_prefix);
 
         let Some(mut idx) = find else {
-            return Ok(Vec::new());
+            return Ok(LookupOutcome::default());
         };
 
         // Walk backward to find start of collision block
@@ -153,23 +200,34 @@ impl LookupTable {
             idx -= 1;
         }
 
-        // Walk forward through collision block, collecting matches
-        let mut results = Vec::new();
+        // Walk forward through the collision block. Full and partial matches are
+        // gathered separately so the limit can prefer full ones; each is itself capped,
+        // so peak retention is bounded whatever the block holds.
+        let mut full_matches: Vec<LookupMatch> = Vec::new();
+        let mut partial_matches: Vec<LookupMatch> = Vec::new();
+        let mut total_matches: usize = 0;
         let mut dict_file = File::open(&self.dict_path)?;
 
         while idx < self.entry_count && self.get_entry_prefix(idx) == search_prefix {
             let position = self.get_entry_position(idx);
             let word = read_word_at(&mut dict_file, position)?;
 
+            // A word the algorithm rejects produces no match, so it is not counted --
+            // total_matches is the number of results that would have been returned
+            // unbounded, not the number of index entries visited.
             if let Some(recomputed) = self.algorithm.hash(&word) {
+                total_matches += 1;
+
                 if recomputed == hash_bytes {
-                    results.push(LookupMatch::Full {
-                        plaintext: word,
-                        recomputed_hash: recomputed,
-                        algorithm: self.algorithm,
-                    });
-                } else {
-                    results.push(LookupMatch::Partial {
+                    if full_matches.len() < limit {
+                        full_matches.push(LookupMatch::Full {
+                            plaintext: word,
+                            recomputed_hash: recomputed,
+                            algorithm: self.algorithm,
+                        });
+                    }
+                } else if partial_matches.len() < limit {
+                    partial_matches.push(LookupMatch::Partial {
                         plaintext: word,
                         recomputed_hash: recomputed,
                         algorithm: self.algorithm,
@@ -180,7 +238,14 @@ impl LookupTable {
             idx += 1;
         }
 
-        Ok(results)
+        let mut matches = full_matches;
+        let room = limit.saturating_sub(matches.len());
+        matches.extend(partial_matches.into_iter().take(room));
+
+        Ok(LookupOutcome {
+            matches,
+            total_matches,
+        })
     }
 
     /// Binary search for a hash prefix. Returns `Some(index)` of a matching entry,

@@ -337,12 +337,14 @@ fn lookup_with_config(config_path: &PathBuf, hashes: &[String], early_exit: bool
             HashResult::Lookup {
                 queried_hash,
                 matches,
+                ..
             } if matches.is_empty() => {
                 println!("{}: NOT FOUND", queried_hash);
             }
             HashResult::Lookup {
                 queried_hash,
                 matches,
+                ..
             } => {
                 for m in matches {
                     let lm = &m.lookup_match;
