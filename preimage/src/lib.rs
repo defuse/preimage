@@ -1,3 +1,7 @@
+//! The crate-level documentation is this repository's README, included so its code
+//! examples are compiled by `cargo test` and cannot rot unnoticed.
+#![doc = include_str!("../../README.md")]
+
 mod index;
 mod oracle;
 

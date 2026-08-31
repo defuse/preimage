@@ -21,7 +21,7 @@ writes the same on-disk index format.
 A wordlist is arbitrary bytes separated by `\n`. For each word, `preimage` records a
 14-byte index entry:
 
-```
+```text
 +---------------------------+-------------------+
 | first 8 bytes of the hash | 6-byte position   |
 +---------------------------+-------------------+
@@ -74,7 +74,7 @@ preimage lookup -a md5 -i md5.idx -d wordlist.txt 5f4dcc3b5aa765d61d8327deb882cf
 
 # 5. See the supported algorithms
 preimage list
-```
+```text
 
 Sorting is deterministic: the same wordlist always produces a byte-identical index.
 
@@ -99,17 +99,18 @@ dictionary = "/data/small.txt"
 
 `PreimageOracle` is the multi-table entry point. Registration order is match order.
 
-```rust
+```rust,no_run
 use preimage::{HashResult, PreimageOracle, MD5, SHA1};
 use std::path::Path;
 
+# fn main() -> anyhow::Result<()> {
 let mut oracle = PreimageOracle::new();
 oracle.register("md5", MD5, Path::new("md5.idx"), Path::new("wordlist.txt"))?;
 oracle.register("sha1", SHA1, Path::new("sha1.idx"), Path::new("wordlist.txt"))?;
 
 for result in oracle.crack(&["5f4dcc3b5aa765d61d8327deb882cf99"], false)? {
     match result {
-        HashResult::Lookup { queried_hash, matches } => {
+        HashResult::Lookup { queried_hash, matches, .. } => {
             for m in matches {
                 println!(
                     "{} = {:?} via {} ({}, full match: {})",
@@ -126,6 +127,8 @@ for result in oracle.crack(&["5f4dcc3b5aa765d61d8327deb882cf99"], false)? {
         }
     }
 }
+# Ok(())
+# }
 ```
 
 Invalid input is a variant, not an error: `crack` returns `InvalidFormat` for
@@ -135,17 +138,32 @@ empty `matches`.
 
 You can index and crack with your own algorithm by implementing one trait:
 
-```rust
-use preimage::{HashAlgorithm, IndexFile};
+```rust,no_run
+use preimage::{HashAlgorithm, IndexFile, PreimageOracle};
+use std::path::Path;
 
+/// A toy algorithm, to keep the example self-contained: a real one would call
+/// into a hash crate here and return the digest bytes.
 struct MyHash;
 
 impl HashAlgorithm for MyHash {
     fn hash(&self, input: &[u8]) -> Option<Vec<u8>> {
-        Some(/* digest bytes */)
+        let mut digest = [0u8; 8];
+        for (slot, byte) in digest.iter_mut().zip(input) {
+            *slot = *byte;
+        }
+        Some(digest.to_vec())
     }
-    fn name(&self) -> &str { "my-hash" }
+
+    fn name(&self) -> &str {
+        "my-hash"
+    }
 }
+
+# fn main() -> anyhow::Result<()> {
+let wordlist = Path::new("wordlist.txt");
+let index_path = Path::new("my-hash.idx");
+let mut oracle = PreimageOracle::new();
 
 // Building takes any reference...
 IndexFile::build(&MyHash, wordlist, index_path, None)?;
@@ -153,6 +171,8 @@ IndexFile::build(&MyHash, wordlist, index_path, None)?;
 // ...while looking up stores the algorithm, so it wants a 'static one.
 static MY_HASH: &dyn HashAlgorithm = &MyHash;
 oracle.register("my-hash", MY_HASH, index_path, wordlist)?;
+# Ok(())
+# }
 ```
 
 A custom algorithm does not join any registry: `preimage list` and the `-a` flag
@@ -165,10 +185,13 @@ index rather than silently indexed as empty.
 
 ## Compatibility
 
-Indexes are byte-compatible with the original PHP/C implementation in both
-directions: `preimage` cracks hashes using indexes built by `createidx.php`, and its
-own output passes the original `checksort`. The test suite checks this against
-committed PHP-generated fixtures rather than trusting the format description.
+`preimage` reads indexes built by the original `createidx.php`. The test suite cracks
+hashes against committed PHP-generated fixtures for md5, sha1 and NTLM, and checks a
+PHP-sorted index with `preimage`'s own checker, rather than trusting the format
+description.
+
+The other direction — the original `checksort` accepting an index `preimage` wrote — is
+not tested here, because that tool is not part of this repository.
 
 ## Development
 
