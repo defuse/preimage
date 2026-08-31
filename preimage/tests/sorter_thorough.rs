@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use preimage::entry::{IndexEntry, ENTRY_SIZE};
+use preimage::entry::{IndexEntry, ENTRY_SIZE, POSITION_LEN};
 use preimage::IndexFile;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -45,6 +45,40 @@ fn read_all_entries(path: &std::path::Path) -> Vec<IndexEntry> {
 
 /// Build a fingerprint map: (hash_prefix, position) -> count.
 /// Used to verify that sorting preserves all entries exactly.
+/// `identical_entries(n)` in the order a correct sort must produce.
+///
+/// Every prefix is equal, so the tie-break decides the entire order -- and it is not
+/// numeric position order. `IndexEntry::compare` falls back to comparing the raw
+/// `[u8; POSITION_LEN]` field, which stores the position **little-endian**, so a
+/// lexicographic array comparison weighs the least significant byte first: position 256
+/// (`[0,1,0,0,0,0]`) sorts before position 1 (`[1,0,0,0,0,0]`).
+///
+/// Derived from the encoding rather than by calling `compare`, so this predicts the
+/// order independently instead of asserting the code against itself.
+fn expected_identical_order(n: usize) -> Vec<([u8; 8], u64)> {
+    let mut positions: Vec<u64> = (0..n as u64).collect();
+    positions.sort_by_key(|p| {
+        let mut bytes = [0u8; POSITION_LEN];
+        for (i, byte) in bytes.iter_mut().enumerate() {
+            *byte = (p >> (i * 8)) as u8;
+        }
+        bytes
+    });
+    positions.into_iter().map(|p| ([0xAA; 8], p)).collect()
+}
+
+/// The entries in order, as comparable values.
+///
+/// `IndexEntry` does not derive `PartialEq`, and the tests need order-sensitive equality:
+/// the comparator is a total order -- hash prefix, then the raw position bytes -- so a
+/// correct sort is deterministic down to the sequence, not just the multiset.
+fn entry_order(entries: &[IndexEntry]) -> Vec<([u8; 8], u64)> {
+    entries
+        .iter()
+        .map(|e| (e.hash_prefix, e.position()))
+        .collect()
+}
+
 fn fingerprint(entries: &[IndexEntry]) -> HashMap<([u8; 8], u64), usize> {
     let mut map = HashMap::new();
     for e in entries {
@@ -373,10 +407,24 @@ fn test_sort_already_sorted_preserves_exact_bytes_large() {
     index.sort(1024 * 1024, None).expect("second sort");
     let sorted_twice = read_all_entries(f.path());
 
-    // Can't guarantee byte-identical (randomized tie-breaking), but must be sorted
-    // and contain the same entries.
+    // The comparator is a total order -- hash prefix, then file position -- so the sort
+    // is fully deterministic and this can be asserted exactly. It used to compare
+    // fingerprints "because of randomized tie-breaking", which does not exist: the
+    // weaker assertion would have passed on an output that reordered every entry.
     assert!(index.check_sorted(None).expect("check"));
-    assert_eq!(fingerprint(&sorted_once), fingerprint(&sorted_twice));
+    assert_eq!(
+        entry_order(&sorted_once),
+        entry_order(&sorted_twice),
+        "a deterministic sort must produce the same entries in the same order"
+    );
+
+    // Idempotence alone would also hold for a sort that dropped or duplicated entries
+    // every time, so check the output against the input as well.
+    assert_eq!(
+        fingerprint(&sorted_once),
+        fingerprint(&entries),
+        "every entry that went in must come out, exactly once"
+    );
 }
 
 // ============================================================
@@ -385,32 +433,38 @@ fn test_sort_already_sorted_preserves_exact_bytes_large() {
 
 #[test]
 fn test_sort_all_identical_small() {
-    // 100 entries with the same hash prefix. The randomized tie-breaking
-    // must prevent O(n^2) behavior and produce a valid sorted output.
+    // 100 entries sharing one hash prefix: the worst case for quicksort, and the case
+    // where the comparator's second key does all the work. `identical_entries` numbers
+    // positions 0..n, and the tie-break fixes their order completely, so this asserts
+    // the exact sequence rather than that the multiset survived.
     let entries = identical_entries(100);
-    let before = fingerprint(&entries);
     let sorted = sort_and_verify(&entries);
 
-    assert_eq!(sorted.len(), 100);
-    assert_eq!(fingerprint(&sorted), before);
+    assert_eq!(
+        entry_order(&sorted),
+        expected_identical_order(100),
+        "with every prefix equal, the tie-break fixes the whole order"
+    );
 }
 
 #[test]
 fn test_sort_all_identical_large() {
-    // 10000 identical entries — stress test for randomized partitioning.
+    // The same at a size that exercises deeper partitioning.
     let entries = identical_entries(10_000);
-    let before = fingerprint(&entries);
     let sorted = sort_and_verify(&entries);
 
-    assert_eq!(sorted.len(), 10_000);
-    assert_eq!(fingerprint(&sorted), before);
+    assert_eq!(
+        entry_order(&sorted),
+        expected_identical_order(10_000),
+        "with every prefix equal, the tie-break fixes the whole order"
+    );
 }
 
 #[test]
 fn test_sort_all_identical_exceeding_buffer() {
-    // Identical entries that exceed the 1 MiB buffer, forcing file-based
-    // partitioning on all-equal keys. This is the pathological case for
-    // quicksort — the randomized tie-breaking is essential here.
+    // Identical entries that exceed the 1 MiB buffer, forcing file-based partitioning
+    // on all-equal keys. This is the pathological case for quicksort, and the one where
+    // a partitioning bug is most likely to reorder or lose entries.
     let n = ENTRIES_PER_MIB + 500;
     let entries = identical_entries(n);
     let f = write_entries(&entries);
@@ -422,9 +476,11 @@ fn test_sort_all_identical_exceeding_buffer() {
     assert!(index.check_sorted(None).expect("check"));
 
     let sorted = read_all_entries(f.path());
-    assert_eq!(sorted.len(), n);
-    // All entries have the same prefix, so fingerprint check ensures no data loss
-    assert_eq!(fingerprint(&sorted), fingerprint(&entries));
+    assert_eq!(
+        entry_order(&sorted),
+        expected_identical_order(n),
+        "the file-based path must reach the same total order as the in-memory one"
+    );
 }
 
 // ============================================================
