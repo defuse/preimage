@@ -95,7 +95,10 @@ EXAMPLES:
         /// Sort buffer size (e.g. 256M, 4G, 1024K)
         #[arg(short, long, default_value = "2G", value_parser = parse_memory_size)]
         memory: usize,
-        /// Load entire file into RAM; error if it doesn't fit
+        /// Load the entire index into RAM. Errors if the allocator refuses the
+        /// request; note that under Linux overcommit the allocation usually
+        /// succeeds and the process is OOM-killed instead, so this is not a
+        /// guarantee that the index fits in available memory.
         #[arg(long)]
         ram: bool,
         /// Path to the index file

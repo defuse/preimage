@@ -108,7 +108,25 @@ impl IndexSorter {
                 usize::MAX,
             )
         });
+        // `try_reserve` rather than letting `resize` allocate: a plain `resize` that
+        // cannot get the memory calls `handle_alloc_error`, which *aborts* the process --
+        // there is no error for the CLI to report, and `--ram` promises one. This turns a
+        // refused allocation into a message naming the size that was refused.
+        //
+        // It does not make the promise unconditional, and the help text no longer claims
+        // it does. Under Linux's default overcommit the kernel grants the reservation and
+        // the process is killed when it touches the pages, so the honest guarantee is
+        // "errors if the allocator refuses", not "errors if it will not fit".
         if self.buffer.len() < count {
+            let extra = count - self.buffer.len();
+            self.buffer.try_reserve(extra).map_err(|e| {
+                anyhow::anyhow!(
+                    "could not allocate {} entries ({} bytes) to sort this index in RAM: {e}. \
+                     Sort without --ram to use the file-based path instead.",
+                    count,
+                    count.saturating_mul(ENTRY_SIZE),
+                )
+            })?;
             self.buffer.resize(count, IndexEntry::new([0; 8], 0));
         }
 
