@@ -67,8 +67,22 @@ impl IndexEntry {
         decode_position(&self.position)
     }
 
-    /// Lexicographic byte comparison: hash prefix first, then position as
-    /// tiebreaker. This makes sort output fully deterministic.
+    /// A total order over entries: hash prefix first, then the raw position bytes.
+    ///
+    /// The tie-break compares the stored `[u8; POSITION_LEN]` field lexicographically,
+    /// and that field is **little-endian**, so the least significant byte is weighed
+    /// first: position 256 (`[0,1,0,0,0,0]`) sorts *before* position 1
+    /// (`[1,0,0,0,0,0]`). This is not numeric position order, and calling it "position as
+    /// tiebreaker" -- as this comment used to -- invites exactly that misreading. Below
+    /// 256 entries the two happen to agree, which is how the misreading survives testing
+    /// unless a test uses more than that.
+    ///
+    /// What the tie-break is for is that it be *total*, not that it be any particular
+    /// order: it makes the sort deterministic, so two builds of the same index are
+    /// byte-identical. Nothing downstream depends on which order it picks --
+    /// `check_sorted` compares prefixes only, because any arrangement within a collision
+    /// block is a valid index. `sorter_thorough::expected_identical_order` pins the order
+    /// this produces, derived from the encoding rather than from this function.
     pub fn compare(&self, other: &Self) -> Ordering {
         self.compare_prefix(other).then_with(|| {
             let a_pos = self.position;
