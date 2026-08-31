@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use memmap2::Mmap;
 
 use super::entry::{decode_position, ENTRY_SIZE, HASH_PREFIX_LEN, POSITION_LEN};
@@ -136,6 +136,37 @@ impl LookupTable {
         }
 
         let entry_count = file_size / ENTRY_SIZE as u64;
+
+        // Prove the dictionary is there and readable now, rather than discovering it on
+        // the first lookup. Nothing else in `open` touches it -- the path is stored and
+        // reopened per lookup -- so without this a table built on a missing or
+        // unreadable wordlist registers cleanly and then fails on live traffic, one
+        // request at a time. A cracker whose dictionary is absent is not a working
+        // cracker, and the place to say so is startup.
+        let dict_size = File::open(dict_path)
+            .with_context(|| {
+                format!(
+                    "dictionary {} for index {} could not be opened",
+                    dict_path.display(),
+                    index_path.display()
+                )
+            })?
+            .metadata()
+            .with_context(|| format!("dictionary {} could not be stat'd", dict_path.display()))?
+            .len();
+
+        // An index with entries can only resolve them to words in a non-empty file, so
+        // this pairing is broken however readable both files are. Catching it here turns
+        // a table that answers "not found" for everything into a refusal to start.
+        if entry_count > 0 && dict_size == 0 {
+            bail!(
+                "dictionary {} is empty but index {} has {} entries; the index and \
+                 dictionary do not belong together",
+                dict_path.display(),
+                index_path.display(),
+                entry_count
+            );
+        }
 
         // SAFETY: memmap2::Mmap::map requires the file not be modified while mapped.
         // We open the index read-only and never modify it.
@@ -327,6 +358,56 @@ mod tests {
     use crate::index::sorter::IndexSorter;
     use crate::{Md5, MD5};
     use tempfile::NamedTempFile;
+
+    /// A table whose dictionary is absent must refuse to open. Without this the table
+    /// registers cleanly and then fails per request, on live traffic, one at a time.
+    #[test]
+    fn a_missing_dictionary_is_refused_at_open() {
+        let index = build_and_sort(&Md5, &test_words_path());
+        let Err(err) = LookupTable::open(MD5, index.path(), Path::new("/nonexistent/words.lst"))
+        else {
+            panic!("a table with no dictionary must not open");
+        };
+
+        let message = format!("{err:#}");
+        assert!(
+            message.contains("/nonexistent/words.lst"),
+            "the error must name the file that is missing: {message}"
+        );
+        assert!(
+            message.contains("could not be opened"),
+            "the error must say what went wrong: {message}"
+        );
+    }
+
+    /// An index with entries cannot resolve any of them against an empty file, so the
+    /// pairing is broken however readable both files are.
+    #[test]
+    fn an_empty_dictionary_under_a_populated_index_is_refused() {
+        let index = build_and_sort(&Md5, &test_words_path());
+        let empty = NamedTempFile::new().expect("temp file");
+
+        let Err(err) = LookupTable::open(MD5, index.path(), empty.path()) else {
+            panic!("an empty dictionary under a populated index must not open");
+        };
+
+        let message = format!("{err:#}");
+        assert!(
+            message.contains("do not belong together"),
+            "the error must name the mismatch: {message}"
+        );
+    }
+
+    /// The check must not reject a legitimately empty pair, or an empty wordlist
+    /// becomes impossible to represent.
+    #[test]
+    fn an_empty_dictionary_under_an_empty_index_is_allowed() {
+        let empty_words = NamedTempFile::new().expect("temp file");
+        let index = build_and_sort(&Md5, empty_words.path());
+
+        LookupTable::open(MD5, index.path(), empty_words.path())
+            .expect("an empty index over an empty dictionary is consistent");
+    }
 
     fn test_words_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
