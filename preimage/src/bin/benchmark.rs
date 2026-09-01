@@ -12,6 +12,10 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
 use preimage::entry::HASH_PREFIX_LEN;
+
+#[path = "shared/memory_size.rs"]
+mod memory_size;
+use memory_size::parse_memory_size;
 use preimage::{get_algorithm, HashAlgorithm, IndexFile, LookupMatch};
 
 #[derive(Parser)]
@@ -100,30 +104,6 @@ fn parse_positive_u64(s: &str) -> Result<u64, String> {
         return Err("must be at least 1".to_string());
     }
     Ok(n)
-}
-
-fn parse_memory_size(s: &str) -> Result<usize, String> {
-    let s = s.trim();
-    let (num_str, multiplier) = if let Some(n) = s.strip_suffix('G') {
-        (n, 1024 * 1024 * 1024)
-    } else if let Some(n) = s.strip_suffix('M') {
-        (n, 1024 * 1024)
-    } else if let Some(n) = s.strip_suffix('K') {
-        (n, 1024)
-    } else {
-        return Err("missing suffix: use K, M, or G (e.g. 256M, 4G)".to_string());
-    };
-
-    let num: f64 = num_str
-        .trim()
-        .parse()
-        .map_err(|_| format!("invalid number: {num_str:?}"))?;
-
-    if num < 0.0 {
-        return Err("memory size cannot be negative".to_string());
-    }
-
-    Ok((num * multiplier as f64) as usize)
 }
 
 fn main() {

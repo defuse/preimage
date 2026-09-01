@@ -9,6 +9,10 @@ use preimage::{
     get_algorithm, HashAlgorithm, HashResult, IndexFile, PreimageOracle, ALGORITHM_NAMES,
 };
 
+#[path = "shared/memory_size.rs"]
+mod memory_size;
+use memory_size::parse_memory_size;
+
 #[derive(Parser)]
 #[command(
     name = "preimage",
@@ -144,30 +148,6 @@ struct LookupArgs {
     early_exit: bool,
     /// Hex-encoded hash(es) to look up
     hashes: Vec<String>,
-}
-
-fn parse_memory_size(s: &str) -> std::result::Result<usize, String> {
-    let s = s.trim();
-    let (num_str, multiplier) = if let Some(n) = s.strip_suffix('G') {
-        (n, 1024 * 1024 * 1024)
-    } else if let Some(n) = s.strip_suffix('M') {
-        (n, 1024 * 1024)
-    } else if let Some(n) = s.strip_suffix('K') {
-        (n, 1024)
-    } else {
-        return Err("missing suffix: use K, M, or G (e.g. 256M, 4G)".to_string());
-    };
-
-    let num: f64 = num_str
-        .trim()
-        .parse()
-        .map_err(|_| format!("invalid number: {num_str:?}"))?;
-
-    if num < 0.0 {
-        return Err("memory size cannot be negative".to_string());
-    }
-
-    Ok((num * multiplier as f64) as usize)
 }
 
 fn main() -> Result<()> {
