@@ -44,16 +44,21 @@ lookup.
 ## Install
 
 ```bash
-cargo install preimage          # the CLI
-cargo add preimage              # the library
+cargo install preimage                              # the CLI
+cargo add preimage --no-default-features            # the library
 ```
 
-The library pulls in `clap` and friends only for the CLI; depend on it with
-`default-features = false` to skip them:
+The default features build the CLI, so a plain `cargo add preimage` also pulls
+`clap`, `toml` and `serde` — 68 crates rather than 39. None of them is used by
+the library; they exist only for `src/bin`. Turning them off costs a library
+consumer nothing:
 
 ```toml
 preimage = { version = "0.1", default-features = false }
 ```
+
+`cargo install preimage` needs the defaults, which is why they are on. Cargo has
+no way to default differently per target.
 
 ## Command line
 
@@ -96,6 +101,15 @@ dictionary = "/data/small.txt"
 ```
 
 ## Library
+
+```toml
+[dependencies]
+preimage = { version = "0.1", default-features = false }
+```
+
+Everything below works with the default features off — they only add the CLI. See
+[Install](#install) for what that saves, and [Trust](#trust) for what the library
+requires of the files you point it at.
 
 `PreimageOracle` is the multi-table entry point. Registration order is match order.
 
