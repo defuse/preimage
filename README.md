@@ -183,6 +183,27 @@ Returning `None` marks input this algorithm cannot represent — that is how LM 
 NTLM skip words outside their encodings, and those words are then absent from the
 index rather than silently indexed as empty.
 
+## Trust
+
+The index and dictionary files must be **trusted**, and must not change while a
+`LookupTable` holds them open. `preimage` searches data you built and own; it is not
+hardened against a hostile index or wordlist.
+
+A corrupt, truncated, unsorted or mismatched pair can make it return confidently wrong
+answers, or terminate the process — an unsorted index defeats the binary search, and a
+dictionary with no line terminator makes a lookup allocate until the allocator gives up.
+Sortedness is not checked at open, deliberately: a production index is hundreds of
+gigabytes and verifying it would mean reading all of it. `preimage check` does that when
+you want it.
+
+What malformed files cannot do is read out of bounds. The entry count comes from the
+file's own length and every access is a bounds-checked slice, so a bad index panics
+rather than reading past the mapping.
+
+Note this is a claim about *files*. The robustness claim below — that invalid input is a
+variant rather than an error — is about the **query string**, and does not extend to the
+files.
+
 ## Compatibility
 
 `preimage` reads indexes built by the original `createidx.php`. The test suite cracks

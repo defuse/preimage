@@ -119,6 +119,35 @@ impl LookupTable {
     ///
     /// The index file must be sorted. The dictionary file is the original
     /// wordlist used to create the index.
+    /// Open an index and bind it to the dictionary it was built from.
+    ///
+    /// # Trust
+    ///
+    /// **Both files must be trusted, and must not change while this table is open.**
+    /// `preimage` is a tool for searching data you built and own; it does not defend
+    /// against a hostile index or wordlist, and pointing it at one obtained from
+    /// elsewhere is outside what it is built for. Concretely, a corrupt, truncated,
+    /// unsorted or mismatched pair can:
+    ///
+    /// * return confidently wrong answers -- lookups binary-search, so an unsorted index
+    ///   reports "not found" for entries that are present. Sortedness is *not* verified
+    ///   here, deliberately: it would mean reading the whole index on every open, and a
+    ///   production index is hundreds of gigabytes. Use `preimage check` for that.
+    /// * terminate the process -- a dictionary with no line terminator makes the
+    ///   per-lookup read allocate until the allocator refuses, and Rust aborts on
+    ///   allocation failure; the OOM killer may arrive first.
+    /// * raise SIGBUS, if the index file is truncated by something else while mapped.
+    ///
+    /// What it cannot do is read out of bounds: the entry count is derived from the
+    /// file's own length and every access is a bounds-checked slice, so a malformed index
+    /// panics rather than reading past the mapping. There is no memory-unsafety path from
+    /// file contents.
+    ///
+    /// The index is pinned by the mmap at open, while the dictionary is re-opened by path
+    /// on every lookup. Replacing the wordlist under a running process therefore leaves
+    /// the index describing the old file and the reads coming from the new one, which
+    /// yields wrong plaintexts rather than an error. Replace an index and its dictionary
+    /// together, and restart anything holding them.
     pub(crate) fn open(
         algorithm: &'static dyn HashAlgorithm,
         index_path: &Path,
@@ -168,8 +197,21 @@ impl LookupTable {
             );
         }
 
-        // SAFETY: memmap2::Mmap::map requires the file not be modified while mapped.
-        // We open the index read-only and never modify it.
+        // SAFETY: `Mmap::map` requires that the file not be modified while mapped -- by
+        // anyone, not just by us. A concurrent truncation makes touching the mapped
+        // pages raise SIGBUS, which is a signal rather than a panic and cannot be caught.
+        //
+        // This code cannot establish that property, and no caller of `mmap` on a file
+        // can: it is a statement about the whole machine. What discharges it here is a
+        // deployment assumption -- the index files are static data owned by the operator,
+        // written once by `preimage create`/`sort` and not touched again while a server
+        // holds them open. Anything that rewrites an index under a running process may
+        // take that process down, and swapping one in place is not a supported update
+        // path (see `LookupTable`'s own docs on why the pairing must be replaced
+        // wholesale).
+        //
+        // Saying "we open it read-only and never modify it", as this comment used to,
+        // answered a question the contract does not ask.
         let index_mmap = unsafe { Mmap::map(&index_file)? };
 
         Ok(Self {

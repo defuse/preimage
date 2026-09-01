@@ -47,6 +47,13 @@ impl PreimageOracle {
     }
 
     /// Register a lookup table.
+    ///
+    /// # Trust
+    ///
+    /// The index and dictionary must be trusted and must not change while registered --
+    /// see [`LookupTable::open`] for what a hostile or corrupt pair can do. In short: it
+    /// can make this crate return wrong answers or kill the process, but it cannot read
+    /// out of bounds.
     pub fn register(
         &mut self,
         label: &str,
@@ -63,6 +70,14 @@ impl PreimageOracle {
     }
 
     /// Crack multiple hashes against all registered tables.
+    ///
+    /// # Errors
+    ///
+    /// All or nothing, deliberately. A read failure against any one table abandons the
+    /// whole batch rather than returning the hashes that did succeed, because a partial
+    /// result is indistinguishable from a complete one at the call site: the caller would
+    /// get plausible-looking rows with the failures silently missing from among them.
+    /// A caller that wants per-hash resilience should call with one hash at a time.
     ///
     /// Iterates tables in registration order. For each table, tries ALL
     /// queried hashes before moving to the next table — this keeps the
