@@ -121,9 +121,10 @@ impl IndexEntry {
 
     /// Bulk read `count` entries into `buf[..count]` via a single `read_exact`.
     ///
-    /// # Safety justification
-    /// `IndexEntry` is `repr(C, packed)` with all-byte fields and no padding,
-    /// so reinterpreting `&mut [IndexEntry]` as `&mut [u8]` is sound.
+    /// # Panics
+    ///
+    /// Panics if `count > buf.len()`. That check is load-bearing rather than defensive:
+    /// it is what keeps the reinterpreted byte slice inside the allocation.
     pub fn read_bulk(
         reader: &mut impl Read,
         buf: &mut [Self],
@@ -138,8 +139,23 @@ impl IndexEntry {
             return Ok(());
         }
         let byte_len = count * ENTRY_SIZE;
-        // SAFETY: IndexEntry is repr(C, packed) with only byte-array fields,
-        // so it has no padding and any bit pattern is valid.
+        // SAFETY: `from_raw_parts_mut` needs the pointer valid for `byte_len` bytes,
+        // properly aligned, and exclusively borrowed. All three hold:
+        //
+        // * **Length.** `byte_len` is `count * ENTRY_SIZE`, and the `const _` assertion
+        //   beside the struct definition makes `size_of::<IndexEntry>() == ENTRY_SIZE` a
+        //   compile error if it ever stops being true, so `count` entries occupy exactly
+        //   `byte_len` bytes. The assert above bounds `count` by `buf.len()`, so those
+        //   bytes are inside the allocation. Widening a field without noticing is the
+        //   failure this pair of checks exists to prevent, and it cannot compile.
+        // * **Alignment.** `[u8]` requires alignment 1, which any pointer satisfies.
+        // * **Aliasing.** `buf` is `&mut`, so this is the only live reference to those
+        //   bytes for the duration of the borrow.
+        //
+        // Writing arbitrary bytes into them is sound because every field is a `[u8; N]`:
+        // the type has no padding and no invalid bit patterns, so whatever the reader
+        // produces is a valid `IndexEntry` -- possibly a meaningless one, which is a
+        // data-integrity question rather than a soundness one.
         let byte_slice =
             unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr() as *mut u8, byte_len) };
         reader.read_exact(byte_slice)
@@ -147,8 +163,9 @@ impl IndexEntry {
 
     /// Bulk write `count` entries from `buf[..count]` via a single `write_all`.
     ///
-    /// # Safety justification
-    /// Same as `read_bulk` — `IndexEntry` is `repr(C, packed)` with no padding.
+    /// # Panics
+    ///
+    /// Panics if `count > buf.len()`, for the same reason as `read_bulk`.
     pub fn write_bulk(writer: &mut impl Write, buf: &[Self], count: usize) -> std::io::Result<()> {
         assert!(
             count <= buf.len(),
@@ -159,7 +176,11 @@ impl IndexEntry {
             return Ok(());
         }
         let byte_len = count * ENTRY_SIZE;
-        // SAFETY: IndexEntry is repr(C, packed) with only byte-array fields.
+        // SAFETY: as in `read_bulk`, but shared rather than exclusive. `byte_len` is
+        // within the allocation because the `const _` assertion pins
+        // `size_of::<IndexEntry>()` to `ENTRY_SIZE` at compile time and the assert above
+        // bounds `count` by `buf.len()`; `[u8]` needs alignment 1; and `buf` is a shared
+        // borrow, so no `&mut` to these bytes can exist while this slice does.
         let byte_slice = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u8, byte_len) };
         writer.write_all(byte_slice)
     }
