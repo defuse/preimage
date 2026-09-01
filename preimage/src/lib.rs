@@ -1,6 +1,11 @@
 //! The crate-level documentation is this repository's README, included so its code
 //! examples are compiled by `cargo test` and cannot rot unnoticed.
-#![doc = include_str!("../../README.md")]
+//!
+//! Read through `preimage/README.md`, a symlink to the file at the repository root, and
+//! not through `../../README.md`: a published crate contains nothing above its own
+//! directory, so the two-level path packages fine and then fails to compile from the
+//! tarball. Cargo follows the symlink and copies the real file in.
+#![doc = include_str!("../README.md")]
 
 mod index;
 mod oracle;
