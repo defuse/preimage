@@ -193,9 +193,11 @@ A custom algorithm does not join any registry: `preimage list` and the `-a` flag
 resolve names through `allthehashes::get_algorithm`, which knows the built-ins
 only. Your type works through the library, not the CLI.
 
-Returning `None` marks input this algorithm cannot represent — that is how LM and
-NTLM skip words outside their encodings, and those words are then absent from the
-index rather than silently indexed as empty.
+Returning `None` marks input this algorithm cannot represent, and such words are
+absent from the index rather than silently indexed as something else. NTLM is the
+only shipped algorithm that uses it: it returns `None` for input that is not valid
+UTF-8, matching the reference implementation's `iconv` failing. Every other
+algorithm here, LM included, accepts any byte string.
 
 ## Trust
 
