@@ -36,7 +36,16 @@ impl HashAlgorithm for Ntlm {
 mod tests {
     use super::*;
 
-    // Test vectors verified against PHP: hash("md4", mb_convert_encoding($s, "UTF-16LE", "UTF-8"))
+    // Vectors verified against the PHP reference this port reproduces --
+    // `MoreHashAlgorithms::GetHashFunction("NTLM")` in crackstation-hashdb's
+    // MoreHashes.php, which is `hash("md4", iconv("UTF-8", "UTF-16LE", $s))`.
+    //
+    // Deliberately not `mb_convert_encoding`: it substitutes invalid sequences rather
+    // than failing, so it hashes input `iconv` rejects. The four valid-UTF-8 vectors
+    // below are identical under both, but 0xFF 0xFE is `false` under `iconv` and
+    // afe43055c4092b6daca53347a5b4d9e2 under `mb_convert_encoding` -- so that function
+    // would contradict `test_ntlm_rejects_invalid_utf8`, the one test here that pins the
+    // behaviour deciding whether a word gets an index entry at all.
 
     #[test]
     fn test_ntlm_empty() {
@@ -62,9 +71,17 @@ mod tests {
         assert_eq!(hex::encode(&hash), "8846f7eaee8fb117ad06bdd830b7586c");
     }
 
+    /// Every one of these is `false` from the PHP reference, and so must be `None` here:
+    /// a UTF-16 BOM read as UTF-8, a lone continuation-less 0xFF, and a truncated
+    /// multi-byte sequence (the "caf\xC3" tail of "caf\u{e9}").
     #[test]
-    fn test_ntlm_invalid_utf8() {
-        let invalid = &[0xFF, 0xFE];
-        assert!(Ntlm.hash(invalid).is_none());
+    fn test_ntlm_rejects_invalid_utf8() {
+        for invalid in [&[0xFF, 0xFE][..], &[0xFF][..], b"caf\xC3"] {
+            assert_eq!(
+                Ntlm.hash(invalid),
+                None,
+                "input {invalid:02x?} must not hash"
+            );
+        }
     }
 }
