@@ -29,11 +29,13 @@ pub trait HashAlgorithm: Send + Sync {
 }
 ```
 
-`hash` returns `Option` rather than always producing digest bytes because some
-algorithms genuinely cannot represent some inputs: NTLM requires valid UTF-8, and
-LM only covers a restricted character set. Returning `None` lets a caller skip
-those inputs instead of silently indexing them as the hash of the empty string —
-a real bug in the PHP code this crate descends from.
+`hash` returns `Option` rather than always producing digest bytes because an
+algorithm may genuinely be unable to represent an input: NTLM requires valid
+UTF-8 and returns `None` otherwise. Returning `None` lets a caller skip those
+inputs instead of silently indexing them as the hash of the empty string — a real
+bug in the PHP code this crate descends from. NTLM is currently the only
+algorithm here that ever returns `None`; every other one, LM included, accepts
+any byte string.
 
 ## Usage
 
@@ -81,6 +83,14 @@ HashAlgorithm`, which a `static MY_HASH: &dyn HashAlgorithm = &MyHash;` satisfie
 - **Checksums**: adler32, crc32, crc32b, crc32c, fnv132, fnv164, fnv1a32,
   fnv1a64, joaat
 - **Password formats**: LM, NTLM, MySQL4.1+, `md5(md5)`, QubesV3.1BackupDefaults
+
+**LM and non-ASCII passwords**: real LM uppercases in the machine's OEM code page
+before hashing; this implementation folds ASCII `a`–`z` bytewise and passes other
+bytes through. A password containing any non-ASCII byte therefore hashes
+differently here than on Windows, and a hash taken from a Windows system will not
+match. That reproduces the PHP implementation these indexes come from, which does
+no code-page conversion either — matching it is what keeps Rust-built and
+PHP-built indexes interchangeable. See the `Lm` type documentation for the detail.
 
 Names are the identifiers `get_algorithm` accepts, and they match PHP's `hash()`
 naming so indexes and scripts written against the PHP originals keep working.

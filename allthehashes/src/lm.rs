@@ -14,6 +14,27 @@ use des::Des;
 /// Uppercase input, pad to 14 bytes, split into two 7-byte halves,
 /// expand each to an 8-byte DES key, DES-ECB encrypt `"KGS!@#$%"`,
 /// concatenate the two 8-byte ciphertexts.
+///
+/// # Divergence from Windows, for non-ASCII input
+///
+/// Real LM uppercases the password in the machine's **OEM code page** (CP437, CP850
+/// and so on) before hashing. This implementation folds ASCII `a`–`z` bytewise and
+/// passes every other byte through unchanged, so for any password containing a byte
+/// outside ASCII the digest **will not match the one Windows computed**, and a hash
+/// captured from a Windows system will not be found by searching an index built with
+/// this. ASCII passwords — the overwhelming majority of what LM was ever used for, and
+/// what a 14-character uppercase-only scheme mostly contains — are unaffected.
+///
+/// This is deliberate: it reproduces the `LMHashAlgorithm` in the PHP implementation
+/// these indexes descend from, which does `strtoupper(substr($string, 0, 14))` with no
+/// code-page conversion either. Matching that is what keeps a Rust-built index and a
+/// PHP-built index interchangeable, which is the point of this crate. Verified against
+/// that implementation across ten inputs including multi-byte UTF-8, raw non-UTF-8
+/// bytes, high bytes, and both sides of the 14-byte truncation — see the tests below.
+///
+/// So the divergence is inherited rather than introduced, and fixing it here alone
+/// would break compatibility with every existing index without making a single extra
+/// password crackable.
 pub struct Lm;
 
 const KGS_CONSTANT: [u8; 8] = *b"KGS!@#$%";
@@ -74,6 +95,66 @@ fn lm_des_encrypt(half: &[u8]) -> [u8; 8] {
 
 #[cfg(test)]
 mod tests {
+    /// Vectors from the reference `LMHashAlgorithm` in crackstation-hashdb's
+    /// MoreHashes.php, run under PHP 8.4.23. Its `LMhash_DESencrypt` calls
+    /// `openssl_encrypt(.., "des-ecb", ..)`, and DES lives in OpenSSL 3's legacy
+    /// provider, so generating these needs an `openssl.cnf` that activates `legacy` --
+    /// without it PHP returns `false` and every vector comes back empty.
+    ///
+    /// These are what the `Lm` docs mean by "verified against that implementation": the
+    /// claim is that this matches PHP byte for byte *including* on input neither handles
+    /// the way Windows would, which is why the non-ASCII cases are here rather than just
+    /// `"password"`.
+    fn lm_hex(input: &[u8]) -> String {
+        Lm.hash(input)
+            .expect("LM accepts any input")
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    }
+
+    #[test]
+    fn matches_php_on_ascii_and_truncation() {
+        // The canonical empty-input LM hash, and a check that PHP agrees.
+        assert_eq!(lm_hex(b""), "aad3b435b51404eeaad3b435b51404ee");
+        assert_eq!(lm_hex(b"password"), "e52cac67419a9a224a3b108f3fa6cb6d");
+        // Case is folded, so these are the same password to LM.
+        assert_eq!(lm_hex(b"PassWord123"), "e52cac67419a9a22664345140a852f61");
+        // Everything past 14 bytes is discarded, so these two agree.
+        assert_eq!(
+            lm_hex(b"ABCDEFGHIJKLMN"),
+            "e0c510199cc66abd8c51ec214bebdea1"
+        );
+        assert_eq!(
+            lm_hex(b"ABCDEFGHIJKLMNO"),
+            "e0c510199cc66abd8c51ec214bebdea1"
+        );
+        assert_eq!(
+            lm_hex(b"thisisaverylongpasswordindeed"),
+            "8a6d8380cac58f224781f57dee2192bc"
+        );
+    }
+
+    /// The divergence documented on `Lm`. Windows would uppercase these in an OEM code
+    /// page first and get different digests; PHP does not, and neither do we. Pinning
+    /// the PHP values is what keeps a Rust-built index interchangeable with a PHP-built
+    /// one -- if this ever starts matching Windows instead, every existing index breaks,
+    /// and these tests are where that shows up.
+    #[test]
+    fn matches_php_on_input_windows_would_treat_differently() {
+        assert_eq!(
+            lm_hex("p\u{e4}ssw\u{f6}rd".as_bytes()),
+            "1141628eb0e6e72ef3343f26aac0ef2f"
+        );
+        assert_eq!(
+            lm_hex(b"\xff\xfe\x00binary"),
+            "9cea3785d00e0c6ffa3975b08bc884c1"
+        );
+        assert_eq!(lm_hex(b"\xe0\xe1\xe2"), "ff78ac5231283bbcaad3b435b51404ee");
+        // Latin-1 lowercase accented bytes: PHP's strtoupper leaves them alone.
+        assert_eq!(lm_hex(b"\xe9\xe8"), "5695e143a4de61c2aad3b435b51404ee");
+    }
+
     use super::*;
 
     #[test]
