@@ -86,6 +86,10 @@ EXAMPLE:
 WARNING: Sorting modifies the file in-place. Do NOT interrupt the process \
 (e.g. Ctrl+C) or the index file will be corrupted and must be regenerated.
 
+An index larger than the memory budget is sorted through a scratch file beside \
+it, so sorting needs free disk space about the size of the index. One that fits \
+in the budget is sorted in RAM with no scratch file.
+
 EXAMPLES:
   Sort with default 2 GiB buffer:
     preimage sort md5.idx
