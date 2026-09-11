@@ -244,12 +244,17 @@ tests. Use `--all-features` to run the whole suite.
 Sorting is covered at the buffer-capacity boundaries — exactly at capacity, one
 under, one over, and multiples of it — plus already-sorted, reverse-sorted and
 all-identical inputs. Every case runs at three memory budgets, so each one is
-sorted both entirely in memory and entirely through the file-based quicksort,
-and the two are required to produce byte-identical files.
+sorted both entirely in memory and through the external merge sort, and the two
+are required to produce byte-identical files.
 
-Note that sorted and reverse-sorted input is not the adversarial case for *this*
-sorter: with a middle-element pivot they are its best case. The input that
-degenerates it is one where every key compares equal.
+The out-of-core path is an external merge sort: one pass writes budget-sized
+sorted runs back over the file, then a k-way merge streams them together (in
+more than one pass only when there are more runs than the merge fan-in). Both
+phases are sequential I/O, and the cost is the same `O(n log n)` on every input
+— there is no adversarial case, because the byte-identical requirement is what
+pins the order down and the comparator is a total order (hash prefix, then the
+unique wordlist position), so all-identical prefixes are just an ordinary run of
+distinct keys.
 
 ## License
 
