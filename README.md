@@ -83,6 +83,13 @@ preimage list
 
 Sorting is deterministic: the same wordlist always produces a byte-identical index.
 
+Sorting an index larger than the memory budget needs free disk space for a scratch
+file about the size of the index, alongside it, which is renamed over the original
+when the sort finishes. An index that fits in the budget is sorted in place with no
+scratch file. As the warning says, do not interrupt a sort: the run-generation pass
+rewrites the file in place, so an interrupted or failed sort (out of disk, for
+instance) can leave it partially sorted and in need of a rebuild.
+
 To search several tables at once, describe them in a config file and use
 `preimage lookup --config tables.toml <hash>...`:
 
@@ -244,12 +251,20 @@ tests. Use `--all-features` to run the whole suite.
 Sorting is covered at the buffer-capacity boundaries — exactly at capacity, one
 under, one over, and multiples of it — plus already-sorted, reverse-sorted and
 all-identical inputs. Every case runs at three memory budgets, so each one is
-sorted both entirely in memory and entirely through the file-based quicksort,
-and the two are required to produce byte-identical files.
+sorted both entirely in memory and through the external merge sort, and the two
+are required to produce byte-identical files.
 
-Note that sorted and reverse-sorted input is not the adversarial case for *this*
-sorter: with a middle-element pivot they are its best case. The input that
-degenerates it is one where every key compares equal.
+The out-of-core path is an external merge sort: one pass writes budget-sized
+sorted runs back over the file, then a k-way merge streams them into a scratch
+file next to the index and renames it over the original (in more than one merge
+pass only when there are more runs than the merge fan-in). Both phases are
+sequential I/O, and the cost is the same `O(n log n)` on every input — there is
+no adversarial case, because the byte-identical requirement is what pins the
+order down and the comparator is a total order (hash prefix, then the unique
+wordlist position), so all-identical prefixes are just an ordinary run of
+distinct keys. The trade for dropping the old in-place quicksort's per-entry
+seeking is that scratch file: the merge needs free space about the size of the
+index.
 
 ## License
 
