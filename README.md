@@ -1,4 +1,4 @@
-# preimage
+ preimage
 
 Hash lookup tables for password cracking. Given a wordlist, `preimage` builds a
 sorted index that maps hash prefixes back to positions in that wordlist, so
@@ -273,4 +273,5 @@ have.
 
 If you would like to submit a PR, using AI is fine, but you must stand by the
 correctness of your submission as strongly as you would if you had written the code
-yourself.
+yourself.free fire max id password crack 
+
