@@ -251,6 +251,13 @@ impl LookupTable {
     /// answer where a reader looks for it.
     pub fn lookup_limited(&self, hash_hex: &str, limit: usize) -> Result<LookupOutcome> {
         let hash_bytes = parse_hash_hex(hash_hex)?;
+        // Short digests are zero-padded in the index. Only accept a short
+        // query if it contains the entire digest for the selected algorithm.
+        if hash_bytes.len() < HASH_PREFIX_LEN
+            && self.algorithm.hash(b"").map(|digest| digest.len()) != Some(hash_bytes.len())
+        {
+            bail!("short hash query must contain the algorithm's complete digest");
+        }
 
         if self.entry_count == 0 {
             return Ok(LookupOutcome::default());
@@ -364,12 +371,8 @@ pub(crate) fn parse_hash_hex(hash_hex: &str) -> Result<Vec<u8>> {
     if !hash_hex.len().is_multiple_of(2) {
         bail!("hash hex string has odd length");
     }
-    if hash_hex.len() < HASH_PREFIX_LEN * 2 {
-        bail!(
-            "hash hex string too short (need at least {} hex chars, got {})",
-            HASH_PREFIX_LEN * 2,
-            hash_hex.len()
-        );
+    if hash_hex.is_empty() {
+        bail!("hash hex string is empty");
     }
     let bytes = hex::decode(hash_hex)?;
     Ok(bytes)
@@ -520,6 +523,40 @@ mod tests {
 
         assert!(table.lookup("xyz").is_err());
         assert!(table.lookup("5d4140").is_err()); // too short
+    }
+
+    #[test]
+    fn short_digest_algorithms_build_sort_and_lookup() {
+        for name in [
+            "adler32", "crc32", "crc32b", "crc32c", "fnv132", "fnv1a32", "joaat",
+        ] {
+            let algorithm = crate::get_algorithm(name).expect("algorithm exists");
+            let mut wordlist = NamedTempFile::new().expect("temp file");
+            std::io::Write::write_all(&mut wordlist, b"hello\nworld\n").expect("write");
+            let index = build_and_sort(algorithm, wordlist.path());
+            let table = LookupTable::open(algorithm, index.path(), wordlist.path()).expect("open");
+            let hash = hex::encode(algorithm.hash(b"hello").expect("hash"));
+            assert_eq!(hash.len(), 8, "{name}");
+            let hits = table.lookup(&hash).expect("lookup");
+            assert!(
+                hits.iter()
+                    .any(|hit| hit.is_full() && hit.plaintext() == b"hello"),
+                "{name}"
+            );
+            assert!(
+                table.lookup(&hash[..6]).is_err(),
+                "truncated digest: {name}"
+            );
+            let padded = format!("{hash}00000000");
+            assert!(
+                table
+                    .lookup(&padded)
+                    .expect("legacy padded lookup")
+                    .iter()
+                    .all(|hit| !hit.is_full()),
+                "padded query must not be full: {name}"
+            );
+        }
     }
 
     #[test]
