@@ -251,6 +251,9 @@ impl LookupTable {
     /// answer where a reader looks for it.
     pub fn lookup_limited(&self, hash_hex: &str, limit: usize) -> Result<LookupOutcome> {
         let hash_bytes = parse_hash_hex(hash_hex)?;
+        if !self.accepts_hash_length(hash_bytes.len()) {
+            bail!("hash hex string too short for selected algorithm");
+        }
 
         if self.entry_count == 0 {
             return Ok(LookupOutcome::default());
@@ -321,6 +324,16 @@ impl LookupTable {
         })
     }
 
+    // Short queries must be complete digests, not truncated prefixes.
+    pub(crate) fn accepts_hash_length(&self, len: usize) -> bool {
+        len >= HASH_PREFIX_LEN
+            || (len > 0
+                && self
+                    .algorithm
+                    .hash(b"")
+                    .is_some_and(|digest| digest.len() == len))
+    }
+
     /// Binary search for a hash prefix. Returns `Some(index)` of a matching entry,
     /// or `None` if not found.
     fn binary_search(&self, target: &[u8; HASH_PREFIX_LEN]) -> Option<u64> {
@@ -364,12 +377,8 @@ pub(crate) fn parse_hash_hex(hash_hex: &str) -> Result<Vec<u8>> {
     if !hash_hex.len().is_multiple_of(2) {
         bail!("hash hex string has odd length");
     }
-    if hash_hex.len() < HASH_PREFIX_LEN * 2 {
-        bail!(
-            "hash hex string too short (need at least {} hex chars, got {})",
-            HASH_PREFIX_LEN * 2,
-            hash_hex.len()
-        );
+    if hash_hex.is_empty() {
+        bail!("hash hex string is empty");
     }
     let bytes = hex::decode(hash_hex)?;
     Ok(bytes)
@@ -509,6 +518,29 @@ mod tests {
         let full_matches: Vec<_> = matches.iter().filter(|m| m.is_full()).collect();
         assert_eq!(full_matches.len(), 1);
         assert_eq!(full_matches[0].plaintext(), b"apple");
+    }
+
+    #[test]
+    fn four_byte_digests_round_trip() {
+        let mut words = NamedTempFile::new().expect("temp file");
+        std::io::Write::write_all(&mut words, b"hello\nworld\n").expect("write");
+        for name in [
+            "adler32", "crc32", "crc32b", "crc32c", "fnv132", "fnv1a32", "joaat",
+        ] {
+            let algorithm = crate::get_algorithm(name).expect("algorithm");
+            let index = build_and_sort(algorithm, words.path());
+            let table = LookupTable::open(algorithm, index.path(), words.path()).expect("open");
+            let hash = hex::encode(algorithm.hash(b"hello").expect("hash"));
+            assert_eq!(hash.len(), 8);
+            let matches = table.lookup(&hash).expect("lookup");
+            assert!(matches
+                .iter()
+                .any(|m| m.is_full() && m.plaintext() == b"hello"));
+            assert!(table.lookup(&hash[..6]).is_err());
+            let padded = table.lookup(&format!("{hash}00000000")).expect("lookup");
+            assert!(!padded.is_empty());
+            assert!(padded.iter().all(|m| !m.is_full()));
+        }
     }
 
     #[test]

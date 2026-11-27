@@ -123,7 +123,13 @@ impl PreimageOracle {
         let mut results: Vec<HashResult<'a>> = hashes
             .iter()
             .map(|h| {
-                if parse_hash_hex(h).is_ok() {
+                if parse_hash_hex(h).is_ok_and(|bytes| {
+                    bytes.len() >= crate::index::entry::HASH_PREFIX_LEN
+                        || self
+                            .tables
+                            .iter()
+                            .any(|table| table.lookup.accepts_hash_length(bytes.len()))
+                }) {
                     HashResult::Lookup {
                         queried_hash: h.to_string(),
                         matches: Vec::new(),
@@ -151,6 +157,11 @@ impl PreimageOracle {
 
                 // Skip if early_exit and we already have a full match
                 if early_exit && has_full_match_in(matches) {
+                    continue;
+                }
+
+                // A short complete digest may apply to only some registered tables.
+                if !table.lookup.accepts_hash_length(hash_hex.len() / 2) {
                     continue;
                 }
 
@@ -214,6 +225,25 @@ mod tests {
         let mut sorter = IndexSorter::new(1024 * 1024);
         sorter.sort_file(index.path(), None).expect("sort");
         index
+    }
+
+    #[test]
+    fn short_digest_in_mixed_oracle() {
+        let words = test_words_path();
+        let algorithm = crate::get_algorithm("crc32").expect("algorithm");
+        let md5 = build_and_sort(MD5, &words);
+        let crc = build_and_sort(algorithm, &words);
+        let mut oracle = PreimageOracle::new();
+        oracle
+            .register("md5", MD5, md5.path(), &words)
+            .expect("register");
+        oracle
+            .register("crc", algorithm, crc.path(), &words)
+            .expect("register");
+        let hash = hex::encode(algorithm.hash(b"apple").expect("hash"));
+        let results = oracle.crack(&[&hash, &hash[..6]], true).expect("crack");
+        assert!(has_full_match(&results[0]));
+        assert!(matches!(&results[1], HashResult::InvalidFormat { .. }));
     }
 
     #[test]

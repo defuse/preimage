@@ -31,7 +31,9 @@ The index is then sorted by hash prefix. To look a hash up, binary search the in
 for its first 8 bytes, seek to each matching position in the wordlist, and read the
 word. Because only a prefix is stored, a hit is a *candidate*: the word is re-hashed
 to confirm it. That re-hash is also what distinguishes a full match from a prefix
-match when you only have a truncated hash.
+match when you only have a truncated hash. Complete digests shorter than eight
+bytes are accepted for algorithms with that digest length; their index prefixes
+are zero-padded. Short truncated queries are not supported.
 
 Storing a prefix rather than the whole digest is what keeps the index small and the
 format algorithm-independent — a 14-byte entry costs the same whether it indexes MD5
